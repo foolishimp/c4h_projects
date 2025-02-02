@@ -1,0 +1,120 @@
+# Path: workflows/00_setup/workflow_structure.yml
+
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"  
+  workspace_root: "workspaces"
+
+providers:
+  anthropic:
+    api_base: "https://api.anthropic.com"
+    default_model: "claude-3-5-sonnet-20241022"
+
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-5-sonnet-20241022"
+  
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      tartxt_config:
+        script_path: "c4h_agents/skills/tartxt.py"
+        input_paths: 
+          - "workflows"
+        exclusions: 
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      intent:
+        description: |
+          Create the initial workflow directory structure and files for managing the refactoring sequence.
+          
+          Required Structure:
+          ```
+          workflows/
+          ├── README.md                       # Documentation
+          ├── sequence.yml                    # Sequence config
+          ├── 01_base_improvements/           # Phase 1
+          │   ├── metrics.yml                
+          │   └── tests/
+          ├── 02_logging_framework/           # Phase 2
+          │   ├── logging.yml
+          │   ├── logdetail.yml
+          │   └── tests/
+          ├── 03_storage_system/             # Phase 3
+          │   ├── base_storage.yml
+          │   ├── event_storage.yml
+          │   └── tests/
+          ├── 04_continuation/               # Phase 4
+          │   ├── continuation.yml
+          │   └── tests/
+          ├── 05_flow_management/            # Phase 5
+          │   ├── flow_context.yml
+          │   ├── response_processing.yml
+          │   └── tests/
+          └── utils/                         # Utilities
+              ├── sequence_validator.py
+              └── config_merger.py
+          ```
+      prompts:
+        system: |
+          You are a project structure designer that creates directories and files.
+          You return ONLY a JSON object with this exact structure, no other text:
+          {
+            "changes": [
+              {
+                "file_path": "path/to/file",
+                "type": "create",
+                "description": "Creating [file|directory] for [purpose]",
+                "content": "file content if applicable"
+              }
+            ]
+          }
+
+          DIRECTORY CREATION RULES:
+          1. For directories, create a .gitkeep file inside:
+             - file_path: "path/to/dir/.gitkeep"
+             - type: "create"
+             - content: "" (empty string)
+
+          FILE CREATION RULES:
+          1. All paths use forward slashes
+          2. Each file must have appropriate content
+          3. Include complete file content
+          4. Maintain consistent formatting
+          5. For YAML files:
+             - Use 2 space indentation
+             - Include comments
+             - Follow configuration hierarchy
+
+          CRITICAL REQUIREMENTS:
+          1. Create ALL directories in the structure
+          2. Create ALL specified files
+          3. Return ONLY the JSON object
+          4. No explanations or markdown
+          5. No conversational text
+          6. Every directory must have .gitkeep
+          7. Every YAML file must be valid
+          8. Create parent directories first
+
+    coder:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      backup_enabled: true
+
+backup:
+  enabled: true
+  path: "workspaces/backups"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
