@@ -1,0 +1,115 @@
+# Path: c4h_services/examples/config/json_parse_fix.yml 
+
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"  
+  workspace_root: "workspaces"
+
+providers:
+  anthropic:
+    api_base: "https://api.anthropic.com"
+    default_model: "claude-3-5-sonnet-20241022"
+
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-5-sonnet-20241022"
+  
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths: 
+          - "c4h_services"
+        exclusions: 
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      intent:
+        description: |
+          Remove unnecessary JSON parsing from agents to follow Agent Design Principles.
+
+          Current Issues:
+          1. JSON parsing in both SolutionDesigner and BaseAgent
+          2. Violates multiple Agent Design Principles:
+             - LLM-First Processing is bypassed
+             - Extra agent logic added
+             - Clear boundaries violated
+             - Single responsibility broken
+          3. Causing errors in workflow execution
+
+          Required Changes:
+          1. c4h_agents/agents/solution_designer.py:
+             - Remove JSON parsing from _process_llm_response
+             - Keep raw content handling
+             - Maintain logging
+             - Let workflow parse if needed
+
+          2. c4h_agents/agents/base.py:
+             - Remove JSON parsing from _get_llm_content
+             - Keep response extraction
+             - Maintain debug logging
+             - Pass raw content through
+
+          Implementation Rules:
+          1. Remove ALL JSON parsing from agents
+          2. Trust LLM formatted output
+          3. Pass through raw responses
+          4. Keep logging for observability
+          5. No loss of core functionality
+
+          Implementation Benefits:
+          1. Follows Agent Design Principles:
+             - LLM-First: Trust LLM formatting
+             - Minimal Logic: No extra parsing
+             - Clear Boundaries: Trust outputs
+             - Observable: Keep logging
+          2. Fixes workflow execution errors
+          3. Simplifies agent code
+          4. Maintains core functionality
+
+          Return the implementation changes as git-style diffs in exact JSON format.
+
+    coder:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      backup_enabled: true
+
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      retention:
+        max_runs: 10
+        max_days: 30
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+    retry:
+      enabled: true
+      max_attempts: 3
+      initial_delay: 1
+      max_delay: 30
+      backoff_factor: 2
+      retry_on:
+        - "overloaded_error"
+        - "rate_limit_error"
+        - "timeout_error"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

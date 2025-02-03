@@ -1,0 +1,132 @@
+# Path: c4h_services/examples/config/workflow_api_service.yml
+
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"  
+  workspace_root: "workspaces"
+
+providers:
+  anthropic:
+    api_base: "https://api.anthropic.com"
+    default_model: "claude-3-5-sonnet-20241022"
+
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-5-sonnet-20241022"
+  
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths: 
+          - "c4h_services"
+        exclusions: 
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      intent:
+        description: |
+          Enhance prefect_runner to support an API service mode while leveraging native Prefect capabilities.
+          
+          Implementation Requirements:
+          1. Add FastAPI API mode to prefect_runner:
+             - Support -S flag to run in service mode
+             - Support -P flag to specify port (default 8000)
+             - Maintain existing CLI functionality when not in service mode
+          
+          2. Required API Endpoints:
+             POST /api/v1/workflow
+             - Accept system_config and app_config in request body 
+             - Validate configs before workflow execution
+             - Return workflow ID and initial status
+             
+             GET /api/v1/workflow/{workflow_id}
+             - Return workflow status and stored events
+             - Use existing event storage system
+          
+          3. Integration with Prefect:
+             - Use Prefect's native deployment system
+             - Leverage Prefect's built-in storage
+             - Keep workflow execution unchanged
+             - Maintain c4h_agents Prefect independence
+          
+          4. Service Implementation Rules:
+             - Keep c4h_agents completely Prefect-unaware
+             - All Prefect integration in c4h_services only
+             - Use FastAPI for modern async API support
+             - Leverage uvicorn as ASGI server
+             - Handle config validation before execution
+             - Support concurrent workflow execution
+          
+          5. Error Handling:
+             - Validate configurations before execution
+             - Proper HTTP error responses
+             - Log API errors appropriately
+             - Handle concurrent requests safely
+          
+          Files to Create/Modify:
+          1. c4h_services/src/api/service.py:
+             - FastAPI application setup
+             - API route handlers
+             - Config validation
+          
+          2. c4h_services/examples/prefect_runner.py:
+             - Add service mode support
+             - Add port configuration
+             - Maintain existing functionality
+          
+          3. c4h_services/src/api/models.py:
+             - Pydantic models for requests/responses
+             - Config validation schemas
+          
+          Constraints:
+          - No changes to c4h_agents library
+          - Preserve all existing prefect_runner functionality
+          - Follow RESTful API best practices
+          - Maintain clear separation of concerns
+          - Handle configs securely
+
+    coder:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      backup_enabled: true
+
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      retention:
+        max_runs: 10
+        max_days: 30
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+    retry:
+      enabled: true
+      max_attempts: 3
+      initial_delay: 1
+      max_delay: 30
+      backoff_factor: 2
+      retry_on:
+        - "overloaded_error"
+        - "rate_limit_error"
+        - "timeout_error"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

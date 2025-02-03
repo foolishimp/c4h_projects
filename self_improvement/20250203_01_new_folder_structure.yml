@@ -26,6 +26,7 @@ llm_config:
           - "**/__pycache__/**"
           - "**/.git/**"
           - "**/*.pyc"
+          - "tests"
         output_type: "stdout"
 
     solution_designer:
@@ -109,6 +110,19 @@ llm_config:
       model: "claude-3-5-sonnet-20241022"
       temperature: 0
       backup_enabled: true
+
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      retention:
+        max_runs: 10
+        max_days: 30
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
 
 backup:
   enabled: true

@@ -1,0 +1,187 @@
+# Path: c4h_services/examples/config/workflow_api_service.yml
+
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"  
+  workspace_root: "workspaces"
+
+providers:
+  anthropic:
+    api_base: "https://api.anthropic.com"
+    default_model: "claude-3-5-sonnet-20241022"
+
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-5-sonnet-20241022"
+  
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths: 
+          - "c4h_services"
+        exclusions: 
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      intent:
+        description: |
+          Implement the FastAPI service for the c4h_services workflow API.
+
+          Implementation Requirements:
+
+          1. API Implementation (c4h_services/src/api/routes/workflow.py):
+             ```python
+             @router.post("/workflow")
+             async def create_workflow(request: WorkflowRequest) -> WorkflowResponse:
+                 # Direct execution with provided configs
+                 # No file system config reading
+                 result = await run_workflow(
+                     system_config=request.system_config,
+                     app_config=request.app_config,
+                     project_path=request.project_path
+                 )
+                 return WorkflowResponse(...)
+             ```
+
+          2. Workflow Execution Service (c4h_services/src/api/services/workflow.py):
+             - Handle workflow execution
+             - Use Prefect state storage
+             - Support concurrent execution
+             - Manage workflow lifecycle
+             ```python
+             async def run_workflow(
+                 system_config: Dict[str, Any],
+                 app_config: Dict[str, Any],
+                 project_path: str
+             ) -> Dict[str, Any]:
+                 # Merge configs
+                 config = deep_merge(system_config, app_config)
+                 # Execute workflow...
+             ```
+
+          3. API Models (c4h_services/src/api/models/workflow.py):
+             ```python
+             class WorkflowRequest(BaseModel):
+                 system_config: Dict[str, Any]
+                 app_config: Dict[str, Any]
+                 project_path: str
+                 intent: Optional[Dict[str, Any]] = None
+
+             class WorkflowStatus(BaseModel):
+                 workflow_id: str
+                 status: str
+                 result: Optional[Dict[str, Any]] = None
+                 execution_time: Optional[float] = None
+             ```
+
+          4. Project Structure:
+             c4h_services/
+             ├── src/
+             │   └── api/
+             │       ├── __init__.py
+             │       ├── service.py          # FastAPI app setup
+             │       ├── models/
+             │       │   ├── __init__.py
+             │       │   └── workflow.py     # Pydantic models
+             │       ├── routes/
+             │       │   ├── __init__.py
+             │       │   └── workflow.py     # Route handlers
+             │       └── services/
+             │           ├── __init__.py
+             │           └── workflow.py     # Business logic
+
+          5. Error Handling:
+             - Proper HTTP status codes
+             - Detailed error responses
+             - Validation error handling
+             - Runtime error handling
+             ```python
+             class WorkflowError(BaseModel):
+                 error: str
+                 details: Optional[Dict[str, Any]] = None
+                 timestamp: datetime
+             ```
+
+          6. Configuration Validation:
+             - Validate required fields
+             - Check configuration structure
+             - Verify project path existence
+             - Validate provider settings
+
+          7. Prefect Integration:
+             - Use native Prefect deployment
+             - Leverage event storage
+             - Maintain workflow state
+             - Support workflow cancellation
+
+          Files to Create:
+          1. c4h_services/src/api/models/workflow.py
+          2. c4h_services/src/api/routes/workflow.py
+          3. c4h_services/src/api/services/workflow.py
+          4. c4h_services/src/api/errors.py
+          5. c4h_services/src/api/service.py
+
+          Constraints:
+          - Fully async FastAPI implementation
+          - No filesystem config reading
+          - Clean separation from c4h_agents
+          - Thread-safe execution
+          - Proper error propagation
+          - Clear logging
+
+          API Design Principles:
+          1. RESTful endpoints
+          2. Clear request/response contracts
+          3. Proper status codes
+          4. Detailed error messages
+          5. Async execution
+          6. State management
+          7. Observability
+
+          Return the implementation in git-style diffs for each file.
+
+    coder:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      backup_enabled: true
+
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      retention:
+        max_runs: 10
+        max_days: 30
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+    retry:
+      enabled: true
+      max_attempts: 3
+      initial_delay: 1
+      max_delay: 30
+      backoff_factor: 2
+      retry_on:
+        - "overloaded_error"
+        - "rate_limit_error"
+        - "timeout_error"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
