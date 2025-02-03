@@ -1,14 +1,100 @@
-# C4H Agents Library API Documentation
+# C4H Agents Library Documentation
 
-## Overview
+## Table of Contents
 
-The C4H Agents library provides a framework for LLM-powered code refactoring with a focus on minimal agent logic and LLM-first processing. This documentation is designed to help LLMs understand and extend the library's capabilities.
+1. [Introduction](#introduction)
+2. [Design Principles](#design-principles)
+3. [Architecture Overview](#architecture-overview)
+4. [Core Components](#core-components)
+5. [Agents](#agents)
+6. [Skills](#skills)
+7. [Integration Patterns](#integration-patterns)
+8. [Configuration Guide](#configuration-guide)
+9. [Best Practices](#best-practices)
+
+## Introduction
+
+The C4H Agents Library provides a framework for LLM-powered code refactoring with a focus on minimal agent logic and LLM-first processing. Built with modularity and extensibility in mind, it supports both standalone usage and integration into larger systems.
+
+Key Features:
+- Modular agent architecture
+- Standardized interfaces
+- Rich configuration system
+- Project-aware operations
+- LLM provider abstraction
+- Built-in backup and safety features
+
+## Design Principles
+
+```mermaid
+graph TB
+    subgraph Principles["Core Design Principles"]
+        llm[LLM-First Processing]
+        minimal[Minimal Agent Logic]
+        boundaries[Clear Boundaries]
+        single[Single Responsibility]
+        stateless[Stateless Operation]
+    end
+
+    subgraph Implementation["Implementation Focus"]
+        prompt[Prompt Engineering]
+        config[Configuration Driven]
+        safety[Safety First]
+        extend[Extensibility]
+    end
+
+    llm --> prompt
+    minimal --> config
+    boundaries --> safety
+    single --> extend
+```
+
+1. **LLM-First Processing**
+   - Leverage LLM capabilities for complex logic
+   - Agent code focused on infrastructure
+   - Trust LLM for decision-making
+
+2. **Minimal Agent Logic**
+   - Keep agent code infrastructure-focused
+   - No business logic in agents
+   - Configuration-driven behavior
+
+3. **Clear Boundaries**
+   - Each agent has focused responsibility
+   - No cross-agent validation
+   - Clean separation of concerns
+
+## Architecture Overview
+
+```mermaid
+classDiagram
+    class BaseAgent {
+        +process(context: Dict)
+        #_get_agent_name()
+        #_format_request(context: Dict)
+        #_process_response(content: str)
+    }
+    
+    class Project {
+        +paths: ProjectPaths
+        +metadata: ProjectMetadata
+        +config: Dict
+        +resolve_path(path: Path)
+        +get_agent_config(agent_name: str)
+    }
+
+    BaseAgent <|-- DiscoveryAgent
+    BaseAgent <|-- SolutionDesigner
+    BaseAgent <|-- Coder
+    BaseAgent <|-- AssuranceAgent
+    
+    BaseAgent --> Project
+```
 
 ## Core Components
 
-### 1. BaseAgent
-
-The foundational class for all agents providing LLM interaction capabilities.
+### BaseAgent
+Core abstraction providing LLM interaction capabilities:
 
 ```python
 from c4h_agents.agents.base import BaseAgent, AgentResponse
@@ -21,33 +107,42 @@ class CustomAgent(BaseAgent):
         return "custom_agent"
     
     def process(self, context: Dict[str, Any]) -> AgentResponse:
-        # Implement agent logic here
+        # Agent-specific logic
         pass
 ```
 
 Key Features:
-- Automatic LLM provider configuration
-- Continuation handling for long responses
-- Consistent logging and metrics
+- Automatic provider configuration
+- Continuation handling
+- Metrics tracking
+- Standardized logging
 - Project context awareness
-- Standardized response format
 
-Configuration Requirements:
-```yaml
-llm_config:
-  agents:
-    agent_name:  # Replace with actual agent name
-      provider: "anthropic"  # or "openai", "gemini"
-      model: "claude-3-opus-20240229"  # Model identifier
-      temperature: 0
-      prompts:
-        system: "System prompt for agent context"
-        # Additional prompt templates as needed
+### Project Model
+Handles project structure and paths:
+
+```python
+from c4h_agents.core.project import Project, ProjectPaths
+
+project = Project.from_config({
+    "project": {
+        "path": "/path/to/project",
+        "workspace_root": "workspaces"
+    }
+})
 ```
 
-### 2. Discovery Agent
+Standard Paths:
+- root: Project root directory
+- workspace: Working files location
+- source: Source code directory
+- output: Output directory
+- config: Configuration location
 
-Analyzes project structure and files.
+## Agents
+
+### Discovery Agent
+Analyzes project structure and files:
 
 ```python
 from c4h_agents.agents.discovery import DiscoveryAgent
@@ -58,7 +153,7 @@ result = discovery.process({
 })
 ```
 
-Configuration Requirements:
+Configuration:
 ```yaml
 llm_config:
   agents:
@@ -67,26 +162,10 @@ llm_config:
         script_path: "path/to/tartxt.py"
         input_paths: ["src", "tests"]
         exclusions: ["**/__pycache__/**"]
-        output_type: "stdout"
 ```
 
-Response Format:
-```python
-{
-    "success": bool,
-    "data": {
-        "files": Dict[str, bool],  # Paths and existence
-        "raw_output": str,        # Complete analysis
-        "project_path": str,
-        "timestamp": str
-    },
-    "error": Optional[str]
-}
-```
-
-### 3. Solution Designer
-
-Creates refactoring solutions based on intent and discovery analysis.
+### Solution Designer
+Creates refactoring solutions:
 
 ```python
 from c4h_agents.agents.solution_designer import SolutionDesigner
@@ -100,18 +179,6 @@ result = designer.process({
 })
 ```
 
-Configuration Requirements:
-```yaml
-llm_config:
-  agents:
-    solution_designer:
-      intent:
-        description: "Intent description"
-      prompts:
-        system: "System prompt"
-        solution: "Solution template"
-```
-
 Response Format:
 ```python
 {
@@ -121,18 +188,16 @@ Response Format:
             {
                 "file_path": str,
                 "type": "create|modify|delete",
-                "description": str,
-                "content": str
+                "content": str,
+                "description": str
             }
         ]
-    },
-    "error": Optional[str]
+    }
 }
 ```
 
-### 4. Coder Agent
-
-Implements code changes safely with backup support.
+### Coder Agent
+Implements code changes with safety:
 
 ```python
 from c4h_agents.agents.coder import Coder
@@ -143,207 +208,179 @@ result = coder.process({
 })
 ```
 
-Configuration Requirements:
-```yaml
-llm_config:
-  agents:
-    coder:
-      backup_enabled: true
-      backup:
-        path: "workspaces/backups"
-```
+Features:
+- Automatic backups
+- Change validation
+- Safe file handling
+- Metrics tracking
 
-Response Format:
-```python
-{
-    "success": bool,
-    "data": {
-        "changes": [
-            {
-                "file": str,
-                "success": bool,
-                "error": Optional[str],
-                "backup": Optional[str]
-            }
-        ],
-        "metrics": {
-            "total_changes": int,
-            "successful_changes": int,
-            "failed_changes": int,
-            "error_count": int,
-            "processing_time": float
-        }
-    },
-    "error": Optional[str]
-}
-```
+## Skills
 
-### 5. Semantic Skills
-
-#### SemanticIterator
-Extracts structured information using fast or slow modes.
+### Semantic Iterator
+Extracts structured information:
 
 ```python
 from c4h_agents.skills.semantic_iterator import SemanticIterator
 from c4h_agents.skills.shared.types import ExtractConfig
 
 iterator = SemanticIterator(config={...})
-iterator.configure(
-    content=content,
-    config=ExtractConfig(
-        instruction="Extraction instruction",
-        format="json"
-    )
+config = ExtractConfig(
+    instruction="Extract instruction",
+    format="json"
 )
 
-for item in iterator:
-    # Process extracted items
-    pass
+for item in iterator.configure(content, config):
+    process_item(item)
 ```
 
-Configuration:
-```yaml
-llm_config:
-  agents:
-    semantic_iterator:
-      extractor_config:
-        mode: "fast|slow"
-        allow_fallback: true
-```
+Modes:
+- Fast: Bulk extraction
+- Slow: Sequential with validation
+- Automatic fallback support
 
-#### SemanticMerge
-Handles code merging with formatting preservation.
+### Semantic Merge
+Handles code merging:
 
 ```python
 from c4h_agents.skills.semantic_merge import SemanticMerge
 
 merger = SemanticMerge(config={...})
 result = merger.process({
-    "file_path": str,
-    "original": str,
-    "diff": str
+    "file_path": path,
+    "original": original_content,
+    "content": new_content
 })
 ```
 
-Configuration:
+Features:
+- Format preservation
+- Safety checks
+- Diff support
+- Backup integration
+
+## Integration Patterns
+
+### Workflow Integration
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Discovery
+    participant Designer
+    participant Coder
+    participant LLM
+
+    App->>Discovery: process(project_path)
+    Discovery->>LLM: analyze_project()
+    LLM-->>Discovery: analysis
+    Discovery-->>App: discovery_result
+
+    App->>Designer: process(discovery_data)
+    Designer->>LLM: design_solution()
+    LLM-->>Designer: changes
+    Designer-->>App: solution_result
+
+    App->>Coder: process(solution_data)
+    Coder->>LLM: validate_changes()
+    LLM-->>Coder: validated
+    Coder-->>App: implementation_result
+```
+
+### Prefect Integration
+
+```python
+from prefect import flow
+from c4h_agents.agents.discovery import DiscoveryAgent
+from c4h_agents.agents.solution_designer import SolutionDesigner
+from c4h_agents.agents.coder import Coder
+
+@flow
+def refactor_workflow(project_path: Path, config: Dict[str, Any]):
+    # Discovery
+    discovery = DiscoveryAgent(config=config)
+    discovery_result = discovery.process({
+        "project_path": project_path
+    })
+    
+    # Solution Design
+    designer = SolutionDesigner(config=config)
+    solution_result = designer.process({
+        "input_data": {
+            "discovery_data": discovery_result.data,
+            "intent": config.get("intent")
+        }
+    })
+    
+    # Implementation
+    coder = Coder(config=config)
+    return coder.process({
+        "input_data": solution_result.data
+    })
+```
+
+## Configuration Guide
+
+### Provider Configuration
+```yaml
+providers:
+  anthropic:
+    api_base: "https://api.anthropic.com"
+    default_model: "claude-3-opus-20240229"
+    litellm_params:
+      retry: true
+      max_retries: 3
+```
+
+### Agent Configuration
 ```yaml
 llm_config:
   agents:
-    semantic_merge:
-      merge_config:
-        preserve_formatting: true
-        allow_partial: false
+    agent_name:
+      provider: "anthropic"
+      model: "claude-3-opus-20240229"
+      temperature: 0
+      prompts:
+        system: "System prompt"
+        custom: "Custom prompt template"
 ```
 
-### 6. Project Management
-
-```python
-from c4h_agents.core.project import Project, ProjectPaths
-
-project = Project.from_config({
-    "project": {
-        "path": "/path/to/project",
-        "workspace_root": "workspaces",
-        "name": "project_name",
-        "version": "1.0.0"
-    }
-})
+### Project Configuration
+```yaml
+project:
+  path: "/path/to/project"
+  workspace_root: "workspaces"
+  source_root: "src"
+  output_root: "output"
 ```
-
-Project paths provided:
-- root: Project root directory
-- workspace: Working files directory
-- source: Source code directory
-- output: Output directory
-- config: Configuration directory
 
 ## Best Practices
 
-1. Configuration Management
-- Always provide complete configuration
-- Use system_config.yml for defaults
-- Override specific settings in application config
+1. **Safety First**
+   - Enable backups
+   - Validate changes
+   - Handle errors gracefully
 
-2. Error Handling
-- Check AgentResponse.success
-- Log errors appropriately
-- Handle backup failures gracefully
+2. **Configuration Management**
+   - Use hierarchical config
+   - Override selectively
+   - Keep secrets in environment
 
-3. Project Context
-- Use Project instance when available
-- Resolve paths through project
-- Maintain workspace structure
+3. **Error Handling**
+   - Check response success
+   - Log operations
+   - Maintain context
 
-4. LLM Integration
-- Follow provider-specific settings
-- Handle continuations automatically
-- Use appropriate temperature settings
+4. **Project Context**
+   - Use Project instance
+   - Resolve paths properly
+   - Maintain workspace structure
 
-5. Agent Design
-- Keep agents focused and minimal
-- Let LLM handle complex logic
-- Use standardized response formats
+5. **LLM Integration**
+   - Follow provider settings
+   - Handle continuations
+   - Use appropriate temperatures
 
-## Common Patterns
-
-1. Basic Agent Flow:
-```python
-agent = AgentClass(config=config)
-result = agent.process(context)
-if result.success:
-    process_result(result.data)
-else:
-    handle_error(result.error)
-```
-
-2. Iterator Pattern:
-```python
-iterator = SemanticIterator(config=config)
-iterator.configure(content=content, config=extract_config)
-results = [item for item in iterator]
-```
-
-3. Project-Aware Pattern:
-```python
-project = Project.from_config(config)
-agent = AgentClass(config=config)
-result = agent.process({
-    "project": project,
-    "input_data": data
-})
-```
-
-4. Safe Code Changes:
-```python
-coder = Coder(config=config)
-result = coder.process({
-    "input_data": {
-        "changes": changes,
-        "project": project
-    }
-})
-if result.success:
-    verify_changes(result.data["changes"])
-```
-
-## Extension Points
-
-1. Custom Agents:
-- Inherit from BaseAgent
-- Implement _get_agent_name()
-- Override process() method
-
-2. New Skills:
-- Follow semantic skill patterns
-- Maintain stateless operation
-- Use standard configurations
-
-3. Custom Extractors:
-- Extend SemanticIterator
-- Implement extraction logic
-- Follow iterator protocol
-
-4. Project Extensions:
-- Extend Project class
-- Add custom path resolution
-- Maintain path abstractions
+6. **Agent Design**
+   - Keep focused purpose
+   - Minimal processing
+   - Clear interfaces
