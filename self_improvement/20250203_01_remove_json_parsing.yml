@@ -4,11 +4,6 @@ project:
   path: "/Users/jim/src/apps/c4h_ai_dev"  
   workspace_root: "workspaces"
 
-providers:
-  anthropic:
-    api_base: "https://api.anthropic.com"
-    default_model: "claude-3-5-sonnet-20241022"
-
 llm_config:
   default_provider: "anthropic"
   default_model: "claude-3-5-sonnet-20241022"
@@ -21,7 +16,7 @@ llm_config:
       tartxt_config:
         script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
         input_paths: 
-          - "c4h_services"
+          - "c4h_agents"
         exclusions: 
           - "**/__pycache__/**"
           - "**/.git/**"
@@ -29,6 +24,8 @@ llm_config:
         output_type: "stdout"
 
     solution_designer:
+##      provider: "openai"
+##      model: "o3-mini"
       provider: "anthropic"
       model: "claude-3-5-sonnet-20241022"
       temperature: 0
