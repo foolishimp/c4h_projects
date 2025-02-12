@@ -12,8 +12,15 @@ This document outlines the design of the *c4h* (coder for hire) framework. The f
 
 ### What are LLMs
 
-- **Definition:**  
+#### Definition 
   Large Language Models (LLMs) are deep neural networks trained on extensive text corpora using transformer architectures.
+
+#### Prompting
+  LLMs are driven to take a 'Prompt' and respond to it based upon their vast training data. It does this by predicting the mostly likely next token (set of characters) to respond with.
+
+  Intuitively you can think of Prompting as a query, with each prompt adding more search criteria. The more search criteria the narrower the set of possible responses, the higher the probabability of fiinding what you are after.
+
+- Think of this as a Venn diagram, each circle represents a possible set of valid responses for a prompt, when you compound the prompts you're constraing the possible set of responses to which the LLM can generate.
 
 <svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">
   <style>
@@ -45,6 +52,8 @@ This document outlines the design of the *c4h* (coder for hire) framework. The f
 - **Definition:**  
   Agents are autonomous software modules designed to perform specific tasks based on inputs and internal rules.
 
+  LLMs require a Prompt to drive them, that prompt represents the **intention** of the user. Agents are used to automate that user intenionality by providing configured prompts to trigger actions and responses.
+
 - **Characteristics:**  
   - **Autonomy:** Execute tasks independently without continuous human intervention.
   - **Interactivity:** Communicate with other agents or systems through predefined protocols.
@@ -60,12 +69,13 @@ Programming in c4h leverages two distinct computation paradigms to address diffe
 #### Deterministic vs Probabilistic Computation
 
 - **Deterministic Computation:**  
-  - **Definition:** Operations yield the same output for a given input by following fixed, unambiguous rules.
+  - **Definition:** This is traditional code like java or python, it is fully dismabiguated and will run in a deterministic predictable way. The main downside of deterministic computation is it needs to be coded to handle every single situation that arises. This means that any changes will cause deterministic code break, unless it has been coded to handle many situations.
   - **Characteristics:**  
     - Predictable and reproducible outcomes.
-    - Common in static analysis, formal verification, and rule-based systems.
+    - Runs on traditional computer systems.
   - **Application in C4H:**  
-    Used for code validation, static analysis, and error detection, ensuring consistency and reliability in outcomes.
+    C4h is written in python including all Agents and Skills.
+    As per the Agent design principles 'Reasoning' behavior is passed to the LLM, BUT everything else is coded in python.
 
 - **Probabilistic Computation:**  
   - **Definition:** Operations produce outputs based on statistical models, introducing variability even with identical inputs.
@@ -74,6 +84,9 @@ Programming in c4h leverages two distinct computation paradigms to address diffe
     - Suitable for handling uncertainty and ambiguity.
   - **Application in C4H:**  
     Underpins LLM-based code generation and adaptive learning modules, enabling flexible handling of incomplete or noisy data.
+    As per Agent design principles all Agent reasoning is offloaded to the LLM.
+
+
 
 ## Agent Framework
 ### Organisation
@@ -152,8 +165,3 @@ This allows people to reason over and understand how they are configuring Agents
 
 Note though as LLMs evolve they will be able to reorganise themselves  far more efficiently than what people need to understand and will start to resemble highly efficient organic structures.
 
-
-
-## c4h Programming Team
-
-## What's Next?
