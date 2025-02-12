@@ -30,91 +30,140 @@ llm_config:
         output_type: "stdout"
 
     solution_designer:
-      provider: "anthropic"
-      model: "claude-3-5-sonnet-20241022"
+      provider: "openai"
+      model: "o3-mini-high"
       temperature: 0
       intent:
         description: |
           Enhance prefect_runner to support an API service mode while leveraging native Prefect capabilities and existing libraries.
-          
-          Design:
+
+          Package Structure Requirements:
+          1. All imports must use absolute paths from project root, following existing pattern:
+             - Use: from c4h_services.src.api.service import app
+             - Use: from c4h_agents.config import deep_merge
+             - Never use relative imports (e.g., from ..src.api.service)
+             -  CRITICAL Import Requirements: Setup import path BEFORE any c4h imports
+              
+              # Setup import path BEFORE any c4h imports
+              root_dir = Path(__file__).parent.parent.parent
+              sys.path.append(str(root_dir))
+
+              # Only after path setup, import c4h packages
+              from c4h_agents.agents.discovery import DiscoveryAgent
+              from c4h_agents.agents.solution_designer import SolutionDesigner
+              from c4h_agents.agents.coder import Coder
+              [...other c4h imports...]
+
+          # 5. Finally import service components
+          from c4h_services.src.api.service import app
+          ```
+
+
+          2. File Organization:
+             ```
+             c4h_services/
+             ├── src/
+             │   ├── api/
+             │   │   ├── __init__.py     # Make package importable
+             │   │   ├── service.py      # FastAPI implementation
+             │   │   └── models.py       # Pydantic models
+             │   └── intent/             # Existing intent service
+             └── examples/
+                 └── prefect_runner.py   # CLI and service entry point
+             ```
+
+          Design Requirements:
           - Design must comply with docs/Agent_Design_Principles.md
           - Config design must comply with docs/Config_Design_Principles.md
+          - All imports must follow c4h_agents import patterns
+          - All new code must use absolute imports
+
           Implementation Requirements:
 
-          1. Add FastAPI API mode to prefect_runner:
-            - Support -S flag to run in service mode
-            - Support -P flag to specify port (default 8000)
-            - Maintain existing CLI functionality when not in service mode
-            - Use existing config loading and project patterns
+          1. Add FastAPI API Mode:
+             prefect_runner.py changes:
+             ```python
+             # Imports must use absolute paths
+             from c4h_services.src.api.service import app
+             from c4h_services.src.api.models import WorkflowRequest
+             
+             # Add service mode support
+             parser.add_argument("-S", "--service", action="store_true")
+             parser.add_argument("-P", "--port", type=int, default=8000)
+             
+             if args.service:
+                 uvicorn.run(app, host="0.0.0.0", port=args.port)
+                 return
+             ```
 
-          2. Required API Endpoints:
-            POST /api/v1/workflow
-              Request Body:
-                - system_config: Dict (YAML or JSON)
-                - app_config: Dict (YAML or JSON) 
-                - project_path: str
-                - intent: Dict
-              Response:
-                - workflow_id: str
-                - status: str
-                - storage_path: Optional[str]
+          2. API Service Implementation:
+             service.py implementation:
+             ```python
+             from c4h_agents.config import deep_merge
+             from c4h_agents.core.project import Project
+             from c4h_services.src.api.models import WorkflowRequest
+             
+             app = FastAPI(
+                 title="C4H Workflow Service",
+                 description="API for executing C4H workflows",
+                 version="0.1.0"
+             )
+             ```
 
-            GET /api/v1/workflow/{workflow_id}
-              Response:
-                - status: str
-                - stages: Dict
-                - events: List[Dict] (using existing event storage)
-                - storage_path: Optional[str]
+          3. API Endpoints:
+             POST /api/v1/workflow:
+               Request:
+                 - system_config: Dict
+                 - app_config: Dict (optional)
+                 - project_path: str
+                 - intent: Dict
+               Response:
+                 - workflow_id: str
+                 - status: str
+                 - storage_path: Optional[str]
 
-          3. Integration with Existing Systems:
-            - Use existing config.deep_merge for config handling
-            - Leverage current storage implementation
-            - Use existing Project model for project handling
-            - Maintain current workflow execution patterns
-            - Use existing logging configuration
+             GET /api/v1/workflow/{workflow_id}:
+               Response:
+                 - status: str
+                 - stages: Dict
+                 - events: List[Dict]
+                 - storage_path: Optional[str]
 
-          4. Service Implementation Rules:
-            - Keep c4h_agents completely Prefect-unaware
-            - Minimize new code by leveraging existing utilities
-            - Use FastAPI with default settings initially
-            - Use uvicorn with standard configuration
-            - Reuse existing config validation patterns
-            - Leverage Prefect's native concurrency
+          4. Required Files:
 
-          5. Error Handling:
-            - Use existing error handling patterns
-            - Standard HTTP status codes
-            - Reuse current logging patterns
-            - Follow existing retry policies
+          a. c4h_services/src/api/service.py:
+             - Use absolute imports
+             - FastAPI app definition
+             - Route handlers
+             - Config loading using c4h_agents.config
+             - Project handling using c4h_agents.core.project
 
-          Files to Create/Modify:
+          b. c4h_services/src/api/models.py:
+             - Pydantic models
+             - No relative imports
+             - Map to existing types
+             - Input/output validation
 
-          1. c4h_services/src/api/service.py:
-            - FastAPI app using existing patterns
-            - Minimal route handlers
-            - Reuse config loading
-            - Use current Project model
+          c. c4h_services/examples/prefect_runner.py:
+             - Update imports to absolute paths
+             - Add service mode
+             - FastAPI integration
+             - CLI argument updates
 
-          2. c4h_services/examples/prefect_runner.py:
-            - Add service mode flags
-            - Integrate FastAPI startup
-            - Maintain CLI functionality
-            - Reuse workflow execution
-
-          3. c4h_services/src/api/models.py:
-            - Basic Pydantic models
-            - Reuse existing structures
-            - Minimal validation logic
-            - Map to existing types
+          Integration Requirements:
+          - Use config.deep_merge for configs
+          - Use Project model for projects
+          - Use existing storage patterns
+          - Maintain workflow patterns
+          - Use existing logging
 
           Constraints:
-            - No changes to c4h_agents library
-            - No security implementation initially
-            - No new configuration patterns
-            - Preserve all CLI functionality
-            - Use existing patterns where possible
-            - Minimize new code
+          - No changes to c4h_agents
+          - No relative imports
+          - No security yet
+          - No new config patterns
+          - Preserve CLI functionality
+          - Minimize new code
 
           Return changes in standard JSON format with file_path, type, description, and complete content.
 
