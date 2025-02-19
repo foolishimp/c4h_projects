@@ -1,0 +1,316 @@
+# Path: c4h_services/examples/config/workflow_openlineage.yml
+
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"  
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    Implement OpenLineage tracking for agent operations while maintaining Agent Design Principles.
+    
+    Required Changes:
+
+    1. New File - c4h_agents/agents/base_lineage.py:
+       - Implement OpenLineage integration following OpenLineage spec v1
+       - Must define these core classes:
+         ```python
+         @dataclass
+         class LineageEvent:
+             input_context: Dict[str, Any]  # Complete agent input
+             messages: LLMMessages         # From agent types
+             raw_output: Any              # Complete LLM response
+             metrics: Optional[Dict]      # Token usage, timing
+             timestamp: datetime          # UTC timestamp
+             parent_run_id: Optional[str] # Workflow context
+             error: Optional[str]         # Any error details
+         
+         class BaseLineage:
+             """OpenLineage tracking implementation"""
+             def __init__(self, namespace: str, agent_name: str, config: Dict)
+             def track_llm_interaction(self, context: Dict, messages: LLMMessages, 
+                                     response: Any, metrics: Optional[Dict] = None) -> None
+             def create_lineage_event(self, state: RunState, inputs: Dict, 
+                                    outputs: Optional[Dict] = None) -> RunEvent
+             def emit_start(self, context: Dict) -> None
+             def emit_complete(self, context: Dict, result: Dict) -> None
+             def emit_failed(self, context: Dict, error: str) -> None
+         ```
+
+    2. Configuration Structure:
+       Add to system_config.yml:
+       ```yaml
+       runtime:
+         lineage:
+           enabled: true  # Control lineage globally
+           backend:
+             type: "file"  # or "marquez"
+             path: "workspaces/lineage"  # for file backend
+             url: ""      # for marquez backend
+             batch_size: 100  # Event batching
+             flush_interval: 30  # Seconds between flushes
+           facets:
+             include_raw_llm: false  # Include complete LLM response
+             include_metrics: true   # Include token usage etc
+             custom_fields: []       # Additional fields to track
+           error_handling:
+             ignore_failures: true  # Continue on lineage errors
+             log_level: "ERROR"
+             max_retries: 3        # Retry failed emissions
+             retry_delay: 1        # Seconds between retries
+       ```
+
+    3. Event Schema Requirements:
+       - Every lineage event must include:
+         * Namespace (from project or default)
+         * Run ID (UUID for each agent instance)
+         * Parent run ID (from workflow context)
+         * Agent name and type
+         * Timestamp (UTC)
+         * Input context:
+           - Complete agent input
+           - Configuration used
+           - Project context if available
+         * LLM interactions:
+           - System prompts
+           - User messages
+           - Assistant responses
+           - Token usage
+           - Duration
+         * Metrics if available:
+           - Token counts
+           - Operation timing
+           - Memory usage
+           - Model details
+         * Error information if applicable
+
+    4. Error Handling Policy:
+       - Lineage failures must not break agent operation
+       - Error handling follows config settings
+       - Failures logged at specified level
+       - Retries follow configured policy
+       - Error details preserved in events
+       - Agent operation continues if ignore_failures=true
+       - Full error context in agent response
+       - Maintain existing error propagation
+       - Storage errors handled separately
+       - Backend failures isolated
+
+    5. Parent/Child Relationship:
+       - Workflow ID passed in context as 'workflow_run_id'
+       - Each agent generates unique run_id using UUID4
+       - Parent relationship uses OpenLineage ParentRunFacet
+       - Complete lineage chain maintained:
+         * Workflow -> Agent -> LLM Interactions
+         * Multiple agent calls in workflow
+         * Chain of thought sequences
+       - Support workflow replay from events
+       - Maintain temporal ordering
+       - Track interaction sequence
+
+    6. Storage Backend:
+       File Backend:
+       - JSON files in lineage directory
+       - Directory structure:
+         /workspaces/lineage/
+           /{date}/
+             /{workflow_id}/
+               /{agent_run_id}/
+                 - manifest.json    # Run metadata
+                 - events/          # Individual events
+                 - metrics/         # Aggregated metrics
+       - Atomic writes with temp files
+       - Regular cleanup of old data
+       - Index files for quick lookup
+       
+       Marquez Backend:
+       - REST API calls
+       - Configurable endpoint
+       - Authentication support
+       - Connection pooling
+       - Request retries
+       - Async operation
+       - Batch submissions
+       - Response caching
+
+    7. Integration Points in BaseAgent:
+       Initialize in __init__:
+       ```python
+       def __init__(self, config: Dict[str, Any] = None):
+           super().__init__(config=config)
+           
+           # Initialize lineage if enabled
+           if self._is_lineage_enabled():
+               self.lineage = BaseLineage(
+                   namespace=self._get_namespace(),
+                   agent_name=self._get_agent_name(),
+                   config=config
+               )
+       ```
+       
+       Track LLM calls:
+       ```python
+       def _get_completion(self, messages: List[Dict]) -> Any:
+           try:
+               start = time.time()
+               response = await self._llm_call(messages)
+               duration = time.time() - start
+               
+               if hasattr(self, 'lineage'):
+                   self.lineage.track_llm_interaction(
+                       context={'messages': messages},
+                       messages=LLMMessages(messages),
+                       response=response,
+                       metrics={
+                           'duration': duration,
+                           'tokens': response.usage
+                       }
+                   )
+               return response
+           except Exception as e:
+               # Error handling
+       ```
+       
+       Lifecycle events:
+       ```python
+       def process(self, context: Dict[str, Any]) -> AgentResponse:
+           try:
+               if hasattr(self, 'lineage'):
+                   self.lineage.emit_start(context)
+                   
+               result = super().process(context)
+               
+               if hasattr(self, 'lineage'):
+                   if result.success:
+                       self.lineage.emit_complete(context, result.data)
+                   else:
+                       self.lineage.emit_failed(context, result.error)
+                       
+               return result
+           except Exception as e:
+               if hasattr(self, 'lineage'):
+                   self.lineage.emit_failed(context, str(e))
+               raise
+       ```
+
+    Critical Constraints:
+    1. No Loss of Functionality:
+       - Keep all existing base agent capabilities
+       - Maintain current logging patterns
+       - Preserve error handling
+       - Keep config patterns
+       - Support all agent types
+       - Maintain backward compatibility
+
+    2. Follow Design Principles:
+       - LLM-First Processing
+       - Minimal Agent Logic
+       - Single Responsibility
+       - Clear Boundaries
+       - Stateless Operation
+       - Observable Behavior
+
+    3. OpenLineage Requirements:
+       - Follow OpenLineage spec v1
+       - Use official Python SDK (openlineage-python>=0.20.0)
+       - Support standard facets:
+         * ParentRunFacet
+         * DocumentationJobFacet
+         * SourceCodeLocationFacet
+       - Enable custom facets for LLM data
+       - Handle spec version changes
+       - Support event versioning
+
+    4. Performance Requirements:
+       - Minimal impact on agent operations
+       - Async event emission
+       - Efficient storage operations
+       - Smart event batching
+       - Memory efficient
+       - Handle high event volume
+
+    5. Testing Requirements:
+       Unit Tests:
+       - BaseLineage class
+       - Event creation
+       - Config handling
+       - Error scenarios
+       - Backend operations
+       
+       Integration Tests:
+       - File backend
+       - Marquez backend
+       - Workflow tracking
+       - Event replay
+       - Error handling
+       
+       Validation:
+       - Config validation
+       - Event schema
+       - Data integrity
+       - Performance impact
+       - Memory usage
+
+    Return changes in standard JSON format with file_path, type, description, and complete content.
+
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths: 
+          - "c4h_services"
+          - "docs"
+        exclusions: 
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+
+    solution_designer:
+#      provider: "anthropic"
+#      model: "claude-3-5-sonnet-20241022"
+      provider: "openai"
+      model: "o3-mini"      
+      temperature: 0
+
+    coder:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      backup_enabled: true
+    semantic_iterator:
+      temperature: 0
+      extractor_config:
+        mode: "fast"
+        allow_fallback: true        
+
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      retention:
+        max_runs: 10
+        max_days: 30
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+    retry:
+      enabled: true
+      max_attempts: 3
+      initial_delay: 1
+      max_delay: 30
+      backoff_factor: 2
+      retry_on:
+        - "overloaded_error"
+        - "rate_limit_error"
+        - "timeout_error"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

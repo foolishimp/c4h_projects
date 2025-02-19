@@ -1,0 +1,56 @@
+flowchart TB
+    subgraph CLI["Prefect Runner CLI"]
+        PR[prefect_runner.py]
+        PR --> RunMode{Run Mode}
+        RunMode -->|agent| AgentExec[Execute Single Agent]
+        RunMode -->|workflow| WFExec[Execute Full Workflow]
+    end
+
+    subgraph Config["Configuration System"]
+        SC[system_config.yml]
+        AC[app_config.yml]
+        SC --> CM[Config Merger]
+        AC --> CM
+        CM --> FC[Final Config]
+        FC -->|Project Paths| PP[Project Configuration]
+        FC -->|Agent Config| AConfig[Agent Configuration]
+        FC -->|Workflow Config| WConfig[Workflow Configuration]
+    end
+
+    subgraph Workflow["Prefect Workflow"]
+        WF[workflows.py]
+        subgraph Flow["Basic Refactoring Flow"]
+            Init[Initialize Flow] --> Discovery
+            Discovery[Discovery Agent] --> Solution[Solution Designer]
+            Solution --> Coder[Coder Agent]
+            Coder --> Complete[Complete Flow]
+        end
+        
+        subgraph Storage["Event Storage"]
+            ES[Store Events] --> WS[Workflow State]
+            ES --> AS[Agent States]
+        end
+        
+        WF --> Flow
+        Flow --> Storage
+    end
+
+    PR -->|Load| Config
+    Config -->|Configure| Workflow
+    
+    subgraph Agents["Agent Tasks"]
+        AT[Agent Task Config]
+        RT[run_agent_task]
+        AT --> RT
+        RT -->|Execute| Agent[BaseAgent Process]
+    end
+
+    WF -->|Create| AT
+    Flow -->|Run| RT
+
+    subgraph BackupSystem["Backup System"]
+        BS[Backup Service]
+        BS -->|Store| Backup[(Backup Storage)]
+    end
+
+    Coder -->|Before Changes| BS

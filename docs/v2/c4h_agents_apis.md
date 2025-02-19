@@ -384,3 +384,208 @@ project:
    - Keep focused purpose
    - Minimal processing
    - Clear interfaces
+
+
+```mermaid
+classDiagram
+    %% Base Classes and Core Infrastructure
+    class BaseConfig {
+        -config: Dict
+        -project: Optional[Project]
+        -metrics: Dict
+        -log_level: LogDetail
+        +_get_provider_config()
+        +_get_agent_config()
+        +_resolve_model()
+        +ensure_paths()
+        +resolve_path()
+    }
+
+    class BaseLLM {
+        +_get_completion_with_continuation()
+        +_process_response()
+        +_get_model_str()
+        +_setup_litellm()
+    }
+
+    class BaseAgent {
+        -provider: LLMProvider
+        -model: str
+        -temperature: float
+        +process()
+        +_process()
+        +_get_data()
+        +_format_request()
+        +_get_llm_content()
+    }
+
+    %% Core Agents
+    class DiscoveryAgent {
+        -workspace_root: Path
+        -tartxt_config: Dict
+        +_run_tartxt()
+        +_parse_manifest()
+        +_resolve_input_paths()
+    }
+
+    class SolutionDesigner {
+        +_format_request()
+        +_extract_context_data()
+        +_validate_input()
+        +_process_llm_response()
+    }
+
+    class Coder {
+        -iterator: SemanticIterator
+        -merger: SemanticMerge
+        -asset_manager: AssetManager
+        -operation_metrics: CoderMetrics
+        +process()
+    }
+
+    class AssuranceAgent {
+        -workspace_root: Path
+        +_run_pytest()
+        +_run_script()
+    }
+
+    %% Semantic Skills
+    class SemanticIterator {
+        -_state: ExtractorState
+        -_fast_extractor: FastExtractor
+        -_slow_extractor: SlowExtractor
+        +configure()
+        +__iter__()
+        +__next__()
+    }
+
+    class SemanticMerge {
+        -preserve_formatting: bool
+        -allow_partial: bool
+        +process()
+        +_get_original_content()
+    }
+
+    class SemanticExtract {
+        +extract()
+        +_format_request()
+    }
+
+    class AssetManager {
+        -project_path: Path
+        -backup_dir: Path
+        -backup_enabled: bool
+        -merger: SemanticMerge
+        +process_action()
+    }
+
+    %% Prefect Components
+    class PrefectRunner {
+        +AGENT_REGISTRY
+        +load_configs()
+        +run_flow()
+        +format_output()
+    }
+
+    class AgentTaskConfig {
+        +agent_class
+        +config: Dict
+        +task_name: str
+        +requires_approval: bool
+    }
+
+    %% Relationships
+    BaseConfig <|-- BaseLLM
+    BaseLLM <|-- BaseAgent
+    BaseAgent <|-- DiscoveryAgent
+    BaseAgent <|-- SolutionDesigner
+    BaseAgent <|-- Coder
+    BaseAgent <|-- AssuranceAgent
+    BaseAgent <|-- SemanticIterator
+    BaseAgent <|-- SemanticMerge
+    BaseAgent <|-- SemanticExtract
+    BaseAgent <|-- AssetManager
+
+    %% Object Flow
+    class WorkflowFlow {
+        +discovery_task
+        +solution_task
+        +coder_task
+        +assurance_task
+    }
+
+    WorkflowFlow --> AgentTaskConfig
+    AgentTaskConfig --> BaseAgent
+    PrefectRunner --> WorkflowFlow
+```
+
+```mermaid
+%% Sequence Diagram for Workflow
+sequenceDiagram
+    participant PR as PrefectRunner
+    participant WF as WorkflowFlow
+    participant DA as DiscoveryAgent
+    participant SD as SolutionDesigner
+    participant CO as Coder
+    participant AS as AssuranceAgent
+
+    PR->>WF: run_flow()
+    WF->>DA: process()
+    DA-->>WF: discovery_result
+    WF->>SD: process(discovery_result)
+    SD-->>WF: solution_result
+    WF->>CO: process(solution_result)
+    CO-->>WF: coder_result
+    WF->>AS: process(coder_result)
+    AS-->>WF: assurance_result
+    WF-->>PR: workflow_result
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> Initialized
+    Initialized --> ProjectScanning: Config Loaded
+    
+    %% Discovery Phase
+    ProjectScanning --> ScanError: tartxt Failed
+    ProjectScanning --> AnalysisComplete: Scan Successful
+    ScanError --> [*]: Exit with Error
+
+    %% Solution Design Phase
+    AnalysisComplete --> GeneratingSolution: SolutionDesigner Start
+    GeneratingSolution --> SolutionError: Design Failed  
+    GeneratingSolution --> SolutionComplete: Changes Designed
+    SolutionError --> [*]: Exit with Error
+
+    %% Implementation Phase    
+    SolutionComplete --> BackupCreation: Start Changes
+    BackupCreation --> CodeModification: Backups Created
+    BackupCreation --> BackupError: Backup Failed
+    BackupError --> [*]: Exit with Error
+    
+    CodeModification --> ImplementationError: Changes Failed
+    CodeModification --> ChangesComplete: Changes Applied
+    ImplementationError --> [*]: Exit with Error
+
+    %% Assurance Phase
+    ChangesComplete --> TestExecution: Run Validation
+    TestExecution --> ValidationError: Tests Failed
+    TestExecution --> ValidationComplete: Tests Passed
+    ValidationError --> [*]: Exit with Error
+
+    %% Success Path
+    ValidationComplete --> [*]: Success
+
+    %% Monitoring state transition triggers
+    ProjectScanning --> LoggingState
+    GeneratingSolution --> LoggingState 
+    CodeModification --> LoggingState
+    TestExecution --> LoggingState
+
+    note right of LoggingState
+        Current Monitoring:
+        - Structured logging via structlog
+        - Metrics collection in BaseAgent
+        - State tracking in Prefect flows
+    end note
+```
