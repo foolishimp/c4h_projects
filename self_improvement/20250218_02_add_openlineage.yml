@@ -1,0 +1,110 @@
+# Path: c4h_services/examples/config/workflow_openlineage_fix.yml
+
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"  
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    Fix the lineage tracking implementation in BaseAgent to properly create lineage events.
+    
+    Current Issues:
+    1. Lineage tracking is placed too late in the _process method
+    2. No lineage events are being created despite initialization
+    
+    Required Fix:
+    Move the lineage tracking call in BaseAgent._process method to immediately after LLM completion but before any response processing.
+    
+    Current Code (problematic placement):
+    ```python
+    # Get LLM completion
+    content, raw_response = self._get_completion_with_continuation([
+        {"role": "system", "content": messages.system},
+        {"role": "user", "content": messages.user}
+    ])
+    
+    # Process response with integrity checks
+    processed_data = self._process_response(content, raw_response)
+    
+    # Track lineage if enabled - WRONG PLACEMENT
+    if self.lineage:
+        self.lineage.track_llm_interaction(
+            context=enhanced_context,
+            messages=messages,
+            response=raw_response,
+            metrics={"token_usage": getattr(raw_response, 'usage', {})}
+        )
+    ```
+    
+    Corrected Code (proper placement):
+    ```python
+    # Get LLM completion
+    content, raw_response = self._get_completion_with_continuation([
+        {"role": "system", "content": messages.system},
+        {"role": "user", "content": messages.user}
+    ])
+    
+    # Track lineage if enabled - CORRECT PLACEMENT
+    if self.lineage:
+        self.lineage.track_llm_interaction(
+            context=enhanced_context,
+            messages=messages,
+            response=raw_response,
+            metrics={"token_usage": getattr(raw_response, 'usage', {})}
+        )
+    
+    # Process response with integrity checks
+    processed_data = self._process_response(content, raw_response)
+    ```
+    
+    Implementation Guidelines:
+    1. Follow Agent Design Principles:
+       - Minimal Changes: Only move the lineage tracking code, no other changes
+       - LLM-First Processing: Track raw interaction before processing
+       - Clear Boundaries: Keep lineage as infrastructure concern
+       - Observable Behavior: Maintain all existing logging
+       
+    2. Apply proper git diff format:
+       - Include enough context lines
+       - Match the exact indentation
+       - Ensure clean patch application
+
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths: 
+          - "c4h_services"
+          - "c4h_agents"
+        exclusions: 
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+
+    coder:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      backup_enabled: true
+
+runtime:
+  lineage:
+    enabled: true
+    backend:
+      type: "file"
+      path: "workspaces/lineage"
+    error_handling:
+      ignore_failures: true
+      log_level: "ERROR"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

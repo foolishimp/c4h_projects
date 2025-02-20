@@ -1,0 +1,107 @@
+# Path: c4h_services/examples/config/workflow_lineage_fix.yml
+
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"  
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    Fix OpenLineage implementation in BaseAgent to prevent AttributeError.
+    
+    Current Issue:
+    We're seeing error: "'SolutionDesigner' object has no attribute 'lineage'"
+    
+    The error occurs when the lineage tracking code attempts to access self.lineage, but this attribute appears to be missing from derived classes like SolutionDesigner.
+    
+    Changes needed:
+    
+    1. Move the lineage tracking call in BaseAgent._process method to properly handle missing lineage attribute:
+    ```python
+    # Get LLM completion
+    content, raw_response = self._get_completion_with_continuation([
+        {"role": "system", "content": messages.system},
+        {"role": "user", "content": messages.user}
+    ])
+    
+    # Track lineage if enabled - with safety check
+    if hasattr(self, 'lineage') and self.lineage:
+        try:
+            self.lineage.track_llm_interaction(
+                context=enhanced_context,
+                messages=messages,
+                response=raw_response,
+                metrics={"token_usage": getattr(raw_response, 'usage', {})}
+            )
+        except Exception as e:
+            logger.error("lineage.tracking_failed", error=str(e))
+            # Continue processing despite lineage failure
+    
+    # Process response with integrity checks
+    processed_data = self._process_response(content, raw_response)
+    ```
+    
+    2. Make sure the lineage attribute is always initialized in BaseAgent.__init__, even if disabled:
+    ```python
+    # Initialize lineage tracking if enabled
+    lineage_config = config.get('runtime', {}).get('lineage', {})
+    if lineage_config.get('enabled', False):
+        self.lineage = BaseLineage(
+            namespace=self.project.metadata.name if self.project else 'default',
+            agent_name=self._get_agent_name(),
+            config=config
+        )
+    else:
+        self.lineage = None  # Ensure attribute always exists
+    ```
+    
+    Implementation Requirements:
+    1. Follow Agent Design Principles:
+       - Add proper error isolation (lineage errors shouldn't affect agent operation)
+       - Add defensive coding for attribute access
+       - Keep changes minimal and focused on making lineage work
+       - Place tracking code at the right time in the process flow
+       
+    2. Ensure compatibility:
+       - Support all derived agent classes
+       - Maintain backward compatibility
+       - Preserve error handling patterns
+
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths: 
+          - "c4h_services"
+          - "c4h_agents"
+        exclusions: 
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+
+    coder:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
+      backup_enabled: true
+
+runtime:
+  lineage:
+    enabled: true
+    backend:
+      type: "file"
+      path: "workspaces/lineage"
+    error_handling:
+      ignore_failures: true
+      log_level: "ERROR"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

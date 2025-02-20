@@ -1,4 +1,4 @@
-# Path: c4h_services/examples/config/workflow_openlineage_stage2.yml
+# Path: c4h_services/examples/config/workflow_openlineage.yml
 
 project:
   path: "/Users/jim/src/apps/c4h_ai_dev"  
@@ -6,171 +6,80 @@ project:
 
 intent:
   description: |
-    Complete and enhance the EXISTING base_lineage.py implementation. 
-    NO NEW LINEAGE FILES should be created - all changes must build on base_lineage.py.
-    Current completion: ~60%
+    Integrate lineage tracking in BaseAgent by initializing and using the existing BaseLineage implementation.
     
+    Problem: BaseAgent isn't creating lineage events despite having the BaseLineage class available.
     
-    Original Goals Status:
-    ✓ Basic OpenLineage integration
-    ✓ Event data model
-    ✓ Backend flexibility
-    ✓ Error handling
-    ✗ BaseAgent integration
-    ✗ Complete type safety
-    ✗ Full async support
-    ✗ Storage robustness
+    Specific Changes Required:
     
-    Required Changes:
-
-    1. Modify c4h_agents/agents/base_agent.py:
-       ```python
-       def __init__(self, config: Dict[str, Any] = None, project: Optional[Project] = None):
-           super().__init__(config=config, project=project)
-           
-           # Initialize lineage
-           namespace = self._get_lineage_namespace()
-           if self._is_lineage_enabled():
-               self.lineage = BaseLineage(
-                   namespace=namespace,
-                   agent_name=self._get_agent_name(),
-                   config=config
-               )
-
-       def _get_lineage_namespace(self) -> str:
-           if self.project:
-               return self.project.metadata.name
-           return "default"
-
-       def _is_lineage_enabled(self) -> bool:
-           return self.config.get("runtime", {}).get("lineage", {}).get("enabled", False)
-       ```
-
-    2. Add to base_llm.py LLM Tracking Points:
-       ```python
-       async def _get_completion(self, messages: List[Dict]) -> Any:
-           start = time.monotonic()
-           try:
-               response = await self._llm_call(messages)
-               duration = time.monotonic() - start
-               
-               if hasattr(self, 'lineage'):
-                   await self.lineage.track_llm_interaction(
-                       context={'messages': messages},
-                       messages=self.messages,
-                       response=response,
-                       metrics={
-                           'duration': duration,
-                           'tokens': getattr(response, 'usage', None)
-                       }
-                   )
-               return response
-           except Exception as e:
-               if hasattr(self, 'lineage'):
-                   await self.lineage.track_llm_interaction(
-                       context={'messages': messages},
-                       messages=self.messages,
-                       response=None,
-                       metrics={'duration': time.monotonic() - start},
-                       error=str(e)
-                   )
-               raise
-       ```
-
-    3. Update base_lineage.py Implementation:
-       a) Fix Type Safety:
-          - Replace Any with proper types
-          - Import LLMMessages from types
-          - Add TypeVars for generic handling
-          
-       b) Make Fully Async:
-          - Convert file operations to aiofiles
-          - Implement proper batching
-          - Add async context manager
-          - Add graceful shutdown
-       
-       c) Improve Storage:
-          - Add atomic file writes
-          - Implement retention policy
-          - Add index files
-          - Support compression
-          
-       d) Add Missing Features:
-          - Chain of thought tracking
-          - Workflow context
-          - Event replay support
-          - Metrics aggregation
-
-    4. Required System Config Updates:
-       Add to system_config.yml:
-       ```yaml
-       runtime:
-         lineage:
-           enabled: true
-           backend:
-             type: "file"
-             path: "workspaces/lineage"
-             batch_size: 100
-             flush_interval: 30
-             compression: true
-             atomic_writes: true
-           retention:
-             max_age_days: 30
-             max_size_gb: 10
-             keep_failed: true
-             compress_after: 7
-           chain_of_thought:
-             enabled: true
-             max_depth: 10
-             track_intermediate: true
-           metrics:
-             enabled: true
-             aggregation_interval: 300
-             custom_fields: []
-       ```
-
-    5. Storage Implementation Requirements:
-       a) Atomic Writes:
-          - Use tempfile for atomic operations
-          - Implement proper locking
-          - Handle partial writes
-          
-       b) Index Files:
-          - Create run_index.json
-          - Track parent/child relationships
-          - Enable fast lookups
-          
-       c) Compression:
-          - Compress old events
-          - Support streaming decompression
-          - Maintain original structure
-
-    6. Testing Requirements:
-       Add tests for:
-       - BaseAgent integration
-       - Async operations
-       - Storage robustness
-       - Type safety
-       - Chain of thought
-       - Metrics collection
-       - Event replay
-       - Performance impact
-
-    Critical Constraints:
-    1. Backward Compatibility:
-       - All changes must be optional
-       - Default disabled
-       - No breaking changes
-       - Graceful degradation
-
-    2. Performance Requirements:
-       - Async operations only
-       - Minimal impact on agent
-       - Efficient storage
-       - Smart batching
-       - Low memory usage
-
-    Return changes in standard JSON format with file_path, type, description, and complete content.
+    1. In BaseAgent.__init__, add lineage initialization:
+    ```python
+    # Initialize lineage tracking if enabled
+    lineage_config = config.get('runtime', {}).get('lineage', {})
+    if lineage_config.get('enabled', False):
+        self.lineage = BaseLineage(
+            namespace=self.project.metadata.name if self.project else 'default',
+            agent_name=self._get_agent_name(),
+            config=config
+        )
+    else:
+        self.lineage = None
+    ```
+    
+    2. In BaseAgent's _process method, add tracking after LLM completion:
+    ```python
+    # After getting content and raw_response from _get_completion_with_continuation:
+    
+    # Track lineage if enabled
+    if self.lineage:
+        self.lineage.track_llm_interaction(
+            context=enhanced_context,
+            messages=messages,
+            response=raw_response,
+            metrics={"token_usage": getattr(raw_response, 'usage', {})}
+        )
+    ```
+    
+    3. Add proper imports in BaseAgent:
+    ```python
+    from .base_lineage import BaseLineage
+    ```
+    
+    4. Log lineage initialization:
+    ```python
+    logger.info(f"{self._get_agent_name()}.initialized", 
+               continuation_settings={
+                   "max_attempts": self.max_continuation_attempts,
+                   "token_buffer": self.continuation_token_buffer
+               },
+               lineage_enabled=lineage_config.get('enabled', False),
+               **log_context)
+    ```
+    
+    5. Update system_config.yml to include lineage configuration:
+    ```yaml
+    runtime:
+      lineage:
+        enabled: true
+        backend:
+          type: "file"
+          path: "workspaces/lineage"
+        error_handling:
+          ignore_failures: true
+          log_level: "ERROR"
+    ```
+    
+    Implementation Requirements:
+    
+    1. Follow Agent Design Principles:
+       - Single Responsibility: Keep lineage handling isolated from core logic
+       - Minimal Change: Only add initialization and one tracking call
+       - Observable Behavior: Log lineage initialization status
+       - No Backward Compatibility Breaks
+    
+    2. Performance considerations:
+       - Don't impact critical path with lineage errors
+       - Use error handling in BaseLineage to isolate failures
 
 llm_config:
   agents:
@@ -179,7 +88,8 @@ llm_config:
         script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
         input_paths: 
           - "c4h_services"
-          - "docs"
+          - "c4h_agents"
+          - "docs/Agent_Design_Principles.md"
         exclusions: 
           - "**/__pycache__/**"
           - "**/.git/**"
@@ -187,10 +97,8 @@ llm_config:
         output_type: "stdout"
 
     solution_designer:
-#      provider: "anthropic"
-#      model: "claude-3-5-sonnet-20241022"
-      provider: "openai"
-      model: "o3-mini"   
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
       temperature: 0
 
     coder:
@@ -198,6 +106,11 @@ llm_config:
       model: "claude-3-5-sonnet-20241022"
       temperature: 0
       backup_enabled: true
+    semantic_iterator:
+      temperature: 0
+      extractor_config:
+        mode: "fast"
+        allow_fallback: true        
 
 runtime:
   workflow:
@@ -224,6 +137,14 @@ runtime:
         - "overloaded_error"
         - "rate_limit_error"
         - "timeout_error"
+  lineage:
+    enabled: true
+    backend:
+      type: "file"
+      path: "workspaces/lineage"
+    error_handling:
+      ignore_failures: true
+      log_level: "ERROR"
 
 logging:
   level: "INFO"
