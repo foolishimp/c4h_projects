@@ -1,3 +1,4 @@
+```mermaid
 flowchart TB
     subgraph CLI["Prefect Runner CLI"]
         PR[prefect_runner.py]
@@ -54,3 +55,441 @@ flowchart TB
     end
 
     Coder -->|Before Changes| BS
+```
+
+```mermaid
+    sequenceDiagram
+    participant User
+    participant solution_designer
+    participant semantic_fast_extractor1 as semantic_fast_extractor #1
+    participant semantic_fast_extractor2 as semantic_fast_extractor #2
+    participant semantic_merge1 as semantic_merge (sample.py)
+    participant semantic_merge2 as semantic_merge (utils.py)
+    participant semantic_merge3 as semantic_merge (main.py)
+    
+    User->>solution_designer: Add logging with lineage tracking
+    
+    %% Solution Designer Step
+    activate solution_designer
+    Note over solution_designer: Creates git diffs for code changes
+    solution_designer-->>semantic_fast_extractor1: Extract needed changes
+    deactivate solution_designer
+    
+    %% Fast Extractor Steps
+    activate semantic_fast_extractor1
+    Note over semantic_fast_extractor1: Extracts changes from solution
+    semantic_fast_extractor1-->>semantic_fast_extractor2: Pass extracted changes
+    deactivate semantic_fast_extractor1
+    
+    activate semantic_fast_extractor2
+    Note over semantic_fast_extractor2: Processes changes
+    semantic_fast_extractor2-->>semantic_merge1: Pass diff for sample.py
+    deactivate semantic_fast_extractor2
+    
+    %% Semantic Merge Steps
+    activate semantic_merge1
+    Note over semantic_merge1: Applies diff to project1/sample.py
+    semantic_merge1-->>semantic_merge2: Continue workflow
+    deactivate semantic_merge1
+    
+    activate semantic_merge2
+    Note over semantic_merge2: Applies diff to project2/utils.py
+    semantic_merge2-->>semantic_merge3: Continue workflow
+    deactivate semantic_merge2
+    
+    activate semantic_merge3
+    Note over semantic_merge3: Applies diff to project2/main.py
+    semantic_merge3-->>User: Return updated code
+    deactivate semantic_merge3
+```
+
+```mermaid
+flowchart TB
+    subgraph CLI["Prefect Runner CLI"]
+        PR[prefect_runner.py]
+        PR --> RunMode{Run Mode}
+        RunMode -->|service| ServiceMode[Start API Service]
+        RunMode -->|agent| AgentExec[Execute Single Agent]
+        RunMode -->|workflow| WFExec[Execute Full Workflow]
+    end
+
+    subgraph Config["Configuration System"]
+        SC[system_config.yml]
+        AC[app_config.yml]
+        SC --> CM[Config Merger]
+        AC --> CM
+        CM --> FC[Final Config]
+        FC -->|Project Paths| PP[Project Configuration]
+        FC -->|Agent Config| AConfig[Agent Configuration]
+        FC -->|Workflow Config| WConfig[Workflow Configuration]
+    end
+
+    subgraph Service["API Service"]
+        API[service.py]
+        WF_Route["/api/v1/workflow"]
+        WF_Status["/api/v1/workflow/{id}"]
+        API --> WF_Route
+        API --> WF_Status
+        WF_Route -->|Run| WFExec
+    end
+
+    subgraph Workflow["Prefect Workflow"]
+        WF[workflows.py]
+        
+        subgraph Flow["Basic Refactoring Flow"]
+            Init[Initialize Flow] --> Discovery
+            Discovery[Discovery Agent] --> Solution[Solution Designer]
+            Solution --> Coder[Coder Agent]
+            Coder --> Assurance[Assurance Agent]
+            Assurance --> Complete[Complete Flow]
+        end
+        
+        subgraph Storage["Event Storage"]
+            ES[Store Events] --> WS[Workflow State]
+            ES --> AS[Agent States]
+        end
+        
+        WF --> Flow
+        Flow --> Storage
+    end
+
+    PR -->|Load| Config
+    Config -->|Configure| Workflow
+    PR -->|Start| Service
+    
+    subgraph AgentRegistry["Agent Registry"]
+        AREG[AGENT_REGISTRY Dict]
+        AREG -->|discovery| DA[DiscoveryAgent]
+        AREG -->|solution_designer| SD[SolutionDesigner]
+        AREG -->|coder| CA[Coder]
+        AREG -->|assurance| AA[AssuranceAgent]
+        AREG -->|semantic_iterator| SI[SemanticIterator]
+        AREG -->|semantic_merge| SM[SemanticMerge]
+        AREG -->|semantic_extract| SE[SemanticExtract]
+        AREG -->|asset_manager| AM[AssetManager]
+    end
+    
+    subgraph Agents["Agent Tasks"]
+        AT[Agent Task Config]
+        RT[run_agent_task]
+        AT --> RT
+        RT -->|Execute| Agent[BaseAgent Process]
+    end
+
+    AgentRegistry -->|Create| AT
+    WF -->|Create| AT
+    Flow -->|Run| RT
+
+    subgraph BackupSystem["Backup System"]
+        BS[Backup Service]
+        BS -->|Store| Backup[(Backup Storage)]
+    end
+
+    Coder -->|Before Changes| BS
+```
+
+
+```mermaid
+    sequenceDiagram
+    participant User
+    participant solution_designer
+    participant semantic_fast_extractor1 as semantic_fast_extractor #1
+    participant semantic_fast_extractor2 as semantic_fast_extractor #2
+    participant semantic_merge1 as semantic_merge (sample.py)
+    participant semantic_merge2 as semantic_merge (utils.py)
+    participant semantic_merge3 as semantic_merge (main.py)
+    
+    User->>solution_designer: Add logging with lineage tracking
+    
+    %% Solution Designer Step
+    activate solution_designer
+    Note over solution_designer: Creates git diffs for code changes
+    solution_designer-->>semantic_fast_extractor1: Extract needed changes
+    deactivate solution_designer
+    
+    %% Fast Extractor Steps
+    activate semantic_fast_extractor1
+    Note over semantic_fast_extractor1: Extracts changes from solution
+    semantic_fast_extractor1-->>semantic_fast_extractor2: Pass extracted changes
+    deactivate semantic_fast_extractor1
+    
+    activate semantic_fast_extractor2
+    Note over semantic_fast_extractor2: Processes changes
+    semantic_fast_extractor2-->>semantic_merge1: Pass diff for sample.py
+    deactivate semantic_fast_extractor2
+    
+    %% Semantic Merge Steps
+    activate semantic_merge1
+    Note over semantic_merge1: Applies diff to project1/sample.py
+    semantic_merge1-->>semantic_merge2: Continue workflow
+    deactivate semantic_merge1
+    
+    activate semantic_merge2
+    Note over semantic_merge2: Applies diff to project2/utils.py
+    semantic_merge2-->>semantic_merge3: Continue workflow
+    deactivate semantic_merge2
+    
+    activate semantic_merge3
+    Note over semantic_merge3: Applies diff to project2/main.py
+    semantic_merge3-->>User: Return updated code
+    deactivate semantic_merge3
+```
+
+```mermaid
+flowchart TB
+    subgraph CLI["Prefect Runner CLI"]
+        PR[prefect_runner.py]
+        PR --> RunMode{Run Mode}
+        RunMode -->|service| ServiceMode[Start API Service]
+        RunMode -->|workflow| WFExec[Execute Full Workflow]
+    end
+
+    subgraph Config["Configuration System"]
+        SC[system_config.yml]
+        AC[app_config.yml]
+        SC --> CM[Config Merger]
+        AC --> CM
+        CM --> FC[Final Config]
+        FC -->|Project Paths| PP[Project Configuration]
+        FC -->|Agent Config| AConfig[Agent Configuration]
+        FC -->|Workflow Config| WConfig[Workflow Configuration]
+    end
+
+    subgraph Service["API Service"]
+        API[service.py]
+        WF_Route["/api/v1/workflow"]
+        WF_Status["/api/v1/workflow/{id}"]
+        API --> WF_Route
+        API --> WF_Status
+        WF_Route -->|Run| WFExec
+    end
+
+    subgraph Workflow["Prefect Workflow"]
+        WF[workflows.py]
+        
+        subgraph Flow["Basic Refactoring Flow"]
+            Init[Initialize Flow] --> Discovery
+            Discovery[Discovery Agent] --> Solution[Solution Designer]
+            Solution --> Coder[Coder Agent]
+            Coder --> Assurance[Assurance Agent]
+            Assurance --> Complete[Complete Flow]
+        end
+        
+        subgraph Storage["Event Storage"]
+            ES[Store Events] --> WS[Workflow State]
+            ES --> AS[Agent States]
+        end
+        
+        WF --> Flow
+        Flow --> Storage
+    end
+
+    PR -->|Load| Config
+    Config -->|Configure| Workflow
+    PR -->|Start| Service
+    
+    subgraph AgentRegistry["Agent Registry"]
+        AREG[AGENT_REGISTRY Dict]
+        AREG -->|discovery| DA[DiscoveryAgent]
+        AREG -->|solution_designer| SD[SolutionDesigner]
+        AREG -->|coder| CA[Coder]
+        AREG -->|assurance| AA[AssuranceAgent]
+        AREG -->|semantic_iterator| SI[SemanticIterator]
+        AREG -->|semantic_merge| SM[SemanticMerge]
+        AREG -->|semantic_extract| SE[SemanticExtract]
+        AREG -->|asset_manager| AM[AssetManager]
+    end
+    
+    subgraph Agents["Agent Tasks"]
+        AT[Agent Task Config]
+        RT[run_agent_task]
+        AT --> RT
+        RT -->|Execute| Agent[BaseAgent Process]
+    end
+
+    AgentRegistry -->|Create| AT
+    WF -->|Create| AT
+    Flow -->|Run| RT
+
+    subgraph BackupSystem["Backup System"]
+        BS[Backup Service]
+        BS -->|Store| Backup[(Backup Storage)]
+    end
+
+    Coder -->|Before Changes| BS
+```
+
+``` mermaid
+flowchart TB
+
+    subgraph Config["Configuration System"]
+        CF["system_config.yml<br>app_config.yml<br>user_config.yml"]
+        CF --> CM[Config Merger]
+        CM --> FC[Final Config]
+        FC -->|Project Paths| PP[Project Configuration]
+        FC -->|Agent Config| AConfig[Agent Configuration]
+        FC -->|Workflow Config| WConfig[Workflow Configuration]
+    end
+
+```
+
+``` mermaid
+classDiagram
+    %% Core Agent Base Classes
+    class BaseAgent {
+        +config: Dict
+        +logger: Logger
+        +__init__(config: Dict)
+        +process(context: Dict) -> Dict
+        #_get_agent_name() -> str
+        #_get_agent_config() -> Dict
+    }
+    
+    %% Core Agents
+    class DiscoveryAgent {
+        +process(context: Dict) -> Dict
+        -_analyze_project() -> Dict
+        -_extract_file_info() -> List
+    }
+    
+    class SolutionDesigner {
+        +process(context: Dict) -> Dict
+        -_create_solution_plan() -> Dict
+        -_generate_design() -> Dict
+    }
+    
+    class Coder {
+        +process(context: Dict) -> Dict
+        -_implement_changes() -> List
+        -_validate_changes() -> Bool
+        -_backup_files() -> None
+    }
+    
+    class AssuranceAgent {
+        +process(context: Dict) -> Dict
+        -_validate_implementation() -> Dict
+        -_run_tests() -> Dict
+    }
+    
+    %% Semantic Skills
+    class SemanticIterator {
+        +config: Dict
+        +instruction: str
+        +format: str
+        +__init__(config: Dict)
+        +process(context: Dict) -> Dict
+        -_iterate_items() -> List
+        -_process_batch() -> List
+        -_process_sequentially() -> List
+    }
+    
+    class SemanticExtract {
+        +process(context: Dict) -> Dict
+        -_extract_data() -> List
+    }
+    
+    class SemanticMerge {
+        +process(context: Dict) -> Dict
+        -_merge_content() -> Dict
+    }
+    
+    class AssetManager {
+        +process(context: Dict) -> Dict
+        -_manage_assets() -> Dict
+        -_track_assets() -> List
+    }
+    
+    %% Configuration Classes
+    class ConfigManager {
+        +load(path: str) -> Dict
+        +merge(base: Dict, override: Dict) -> Dict
+        +locate_config(config: Dict, target: str) -> Dict
+    }
+    
+    %% Project Classes
+    class Project {
+        +path: Path
+        +workspace: Path
+        +__init__(path: Path, workspace: Path)
+        +get_files() -> List
+        +read_file(path: Path) -> str
+        +write_file(path: Path, content: str) -> None
+        +backup_file(path: Path) -> Path
+    }
+    
+    %% Workflow Classes
+    class PrefectWorkflow {
+        +run_basic_workflow(project_path: Path, intent_desc: Dict, config: Dict) -> Dict
+        -_initialize_flow() -> None
+        -_configure_agents() -> Dict
+        -_store_results() -> None
+    }
+    
+    class AgentTaskConfig {
+        +agent_class: Type
+        +config: Dict
+        +task_name: str
+        +__init__(agent_class: Type, config: Dict, task_name: str)
+    }
+    
+    %% API Service Classes
+    class APIService {
+        +app: FastAPI
+        +create_app(default_config: Dict) -> FastAPI
+        -_register_routes() -> None
+    }
+    
+    class WorkflowRequest {
+        +project_path: str
+        +intent: Dict
+        +system_config: Dict
+        +app_config: Dict
+    }
+    
+    class WorkflowResponse {
+        +workflow_id: str
+        +status: str
+        +storage_path: str
+        +error: str
+    }
+    
+    %% CLI Classes
+    class PrefectRunner {
+        +run_flow(mode: RunMode, config: Dict, agent_type: str) -> Dict
+        +load_configs(app_config_path: str, system_config_paths: List) -> Dict
+        +format_output(data: Dict, mode: RunMode) -> None
+        +main() -> None
+    }
+    
+    class RunMode {
+        AGENT
+        WORKFLOW
+        SERVICE
+    }
+    
+    %% Relationships
+    BaseAgent <|-- DiscoveryAgent
+    BaseAgent <|-- SolutionDesigner
+    BaseAgent <|-- Coder
+    BaseAgent <|-- AssuranceAgent
+    
+    BaseAgent <|-- SemanticIterator
+    BaseAgent <|-- SemanticExtract
+    BaseAgent <|-- SemanticMerge
+    BaseAgent <|-- AssetManager
+    
+    PrefectWorkflow ..> AgentTaskConfig : creates
+    PrefectWorkflow ..> BaseAgent : uses
+    
+    PrefectRunner ..> ConfigManager : uses
+    PrefectRunner ..> PrefectWorkflow : executes
+    PrefectRunner ..> APIService : starts
+    
+    APIService ..> WorkflowRequest : processes
+    APIService ..> WorkflowResponse : returns
+    APIService ..> PrefectWorkflow : executes
+    
+    PrefectWorkflow ..> Project : operates on
+    Coder ..> Project : modifies
+    DiscoveryAgent ..> Project : analyzes
+```

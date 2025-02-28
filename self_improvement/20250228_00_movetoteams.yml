@@ -1,0 +1,155 @@
+# Path: c4h_services/examples/config/workflow_team_orchestration.yml
+
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"  
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    Implement a team-based orchestration system using native Prefect while maintaining Agent Design Principles and Config Design Principles.
+    
+    Goal: Refactor the current static workflow model with Prefect into a flexible team-based orchestration system where:
+    
+    1. Teams are configurable groups of agents that can be dynamically composed
+    2. Teams can be chained together (Team A -> Team B -> Team C)
+    3. Conditional routing between teams is supported (Team A -> Team B -> Team C -> Team A OR Exit)
+    4. The entire system leverages native Prefect capabilities rather than replacing them
+    
+    Required Components:
+    
+    1. Team Model:
+       - Represents a group of agents that execute in sequence
+       - Has configurable routing rules to determine next team
+       - Implements Prefect flow functionality
+       - Maintains the same config structure and inheritance pattern
+    
+    2. Agent Task:
+       - Process function for executing individual agents
+       - Supports dynamic agent class loading
+       - Maintains artifact tracking
+       - Preserves the existing agent config access patterns
+    
+    3. Orchestrator:
+       - Manages team execution and chaining
+       - Loads team configurations from YAML
+       - Executes workflows with optional team entry points
+       - Supports both sequential and conditional workflow paths
+    
+    4. Intent Service Implementation:
+       - Builds upon but doesn't replace the existing Prefect implementation
+       - Implements the IntentService protocol
+       - Maintains compatibility with existing API
+       - Preserves lineage tracking and artifact creation
+    
+    5. Configuration Schema:
+       - Follows hierarchical configuration principles from Config_Design_Principles.md
+       - YAML format for defining teams and routing rules
+       - Supports conditional and default routing
+       - Maintains backward compatibility with existing config structure
+    
+    The implementation should respect:
+    
+    1. Agent Design Principles (from Agent_Design_Principles.md):
+       - LLM-First Processing: Keep agent code focused on infrastructure
+       - Single Responsibility: Each component has one clear task
+       - Clear Boundaries: Team, Agent, and Orchestrator responsibilities clearly defined
+       - Minimal Processing: Pass data through to LLM without unnecessary transformation
+       - Observable Behavior: Maintain extensive logging and artifact tracking
+       - Stateless Operation: Agents don't maintain state between operations
+       - Composability: Agents can be chained together
+    
+    2. Config Design Principles (from Config_Design_Principles.md):
+       - Hierarchical Configuration: Follow strict hierarchy for all config
+       - Smart Merge Behavior: Base config provides foundation, override config adds/updates
+       - Separation of Responsibilities: Each component owns its config section
+       - Config Location: Clear hierarchical paths
+       - Config Access: Agents access only their own config section
+    
+    Key Files to Extend/Modify:
+    - c4h_services/src/intent/impl/prefect/workflows.py
+    - c4h_services/src/intent/impl/prefect/tasks.py
+    - c4h_services/src/intent/impl/prefect/models.py
+    - c4h_services/src/intent/impl/prefect/factories.py
+    - c4h_services/src/api/service.py
+    
+    Create New Files:
+    - c4h_services/src/orchestration/team.py
+    - c4h_services/src/orchestration/orchestrator.py
+    - c4h_services/src/intent/impl/team/service.py
+    
+    Event Model:
+    - Design a simple event structure for passing data between teams and agents
+    - Preserve workflow_run_id and saga_id concepts for traceability
+    - Include source/target information for routing
+    - Support context propagation between teams
+    
+    All changes should maintain backward compatibility with existing functionality while adding the new team-based capabilities. The system should be designed to allow gradual migration from the current static workflow to the new team-based approach.
+
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths: 
+          - "c4h_services"
+          - "c4h_agents"
+          - "docs/Agent_Design_Principles.md"
+          - "docs/Config_Design_Principles.md"
+          - "docs/Agent_Design_Refinements.md"
+        exclusions: 
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+#      provider: "openai"
+#      model: "o3-mini"    
+      temperature: 0
+
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+    
+    semantic_iterator:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"    
+      temperature: 0
+      extractor_config:
+        mode: "fast"
+        allow_fallback: true        
+
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      retention:
+        max_runs: 10
+        max_days: 30
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+    retry:
+      enabled: true
+      max_attempts: 3
+      initial_delay: 1
+      max_delay: 30
+      backoff_factor: 2
+      retry_on:
+        - "overloaded_error"
+        - "rate_limit_error"
+        - "timeout_error"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

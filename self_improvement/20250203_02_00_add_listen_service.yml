@@ -113,8 +113,11 @@ intent:
         - Input/output validation
 
     c. c4h_services/examples/prefect_runner.py:
+        - do not loese existing CLI functionality 
         - Update imports to absolute paths
-        - Add service mode
+        - Add new service mode -p for explicit port otherwise next available port
+        - Log statement saying what port the service is running on
+        - -S for service mode
         - FastAPI integration
         - CLI argument updates
 
@@ -151,14 +154,18 @@ llm_config:
         output_type: "stdout"
 
     solution_designer:
-      provider: "anthropic"
-      model: "claude-3-5-sonnet-20241022"
+#      provider: "anthropic"
+#      model: "claude-3-7-sonnet-20250219"
+      provider: "openai"
+      model: "o3-mini"          
       temperature: 0
 
 
     coder:
-      provider: "anthropic"
-      model: "claude-3-5-sonnet-20241022"
+      provider: "openai"
+      model: "o3-mini"        
+#      provider: "anthropic"
+#      model: "claude-3-7-sonnet-20250219"
       temperature: 0
       backup_enabled: true
 

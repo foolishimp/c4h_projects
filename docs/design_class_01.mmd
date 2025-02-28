@@ -1,0 +1,220 @@
+```mermaid
+classDiagram
+    %% Core Agent Base Classes
+    class BaseAgent {
+        +config: Dict
+        +logger: Logger
+        +__init__(config: Dict)
+        +process(context: Dict) -> Dict
+        #_get_agent_name() -> str
+        #_get_agent_config() -> Dict
+    }
+    
+    %% Core Agents
+    class DiscoveryAgent {
+        +process(context: Dict) -> Dict
+        -_analyze_project() -> Dict
+        -_extract_file_info() -> List
+    }
+    
+    class SolutionDesigner {
+        +process(context: Dict) -> Dict
+        -_create_solution_plan() -> Dict
+        -_generate_design() -> Dict
+    }
+    
+    class Coder {
+        +process(context: Dict) -> Dict
+        -_implement_changes() -> List
+        -_validate_changes() -> Bool
+        -_backup_files() -> None
+    }
+    
+    class AssuranceAgent {
+        +process(context: Dict) -> Dict
+        -_validate_implementation() -> Dict
+        -_run_tests() -> Dict
+    }
+    
+    %% Semantic Skills
+    class SemanticIterator {
+        +config: Dict
+        +instruction: str
+        +format: str
+        +__init__(config: Dict)
+        +process(context: Dict) -> Dict
+        -_iterate_items() -> List
+        -_process_batch() -> List
+        -_process_sequentially() -> List
+    }
+    
+    class SemanticExtract {
+        +process(context: Dict) -> Dict
+        -_extract_data() -> List
+    }
+    
+    class SemanticMerge {
+        +process(context: Dict) -> Dict
+        -_merge_content() -> Dict
+    }
+    
+    class AssetManager {
+        +process(context: Dict) -> Dict
+        -_manage_assets() -> Dict
+        -_track_assets() -> List
+    }
+    
+    %% Configuration Classes
+    class ConfigManager {
+        +load(path: str) -> Dict
+        +merge(base: Dict, override: Dict) -> Dict
+        +locate_config(config: Dict, target: str) -> Dict
+    }
+    
+    %% Project Classes
+    class Project {
+        +path: Path
+        +workspace: Path
+        +__init__(path: Path, workspace: Path)
+        +get_files() -> List
+        +read_file(path: Path) -> str
+        +write_file(path: Path, content: str) -> None
+        +backup_file(path: Path) -> Path
+    }
+    
+    %% Workflow Classes
+    class PrefectWorkflow {
+        +run_basic_workflow(project_path: Path, intent_desc: Dict, config: Dict) -> Dict
+        -_initialize_flow() -> None
+        -_configure_agents() -> Dict
+        -_store_results() -> None
+    }
+    
+    class AgentTaskConfig {
+        +agent_class: Type
+        +config: Dict
+        +task_name: str
+        +__init__(agent_class: Type, config: Dict, task_name: str)
+    }
+    
+    %% API Service Classes
+    class APIService {
+        +app: FastAPI
+        +create_app(default_config: Dict) -> FastAPI
+        -_register_routes() -> None
+    }
+    
+    class WorkflowRequest {
+        +project_path: str
+        +intent: Dict
+        +system_config: Dict
+        +app_config: Dict
+    }
+    
+    class WorkflowResponse {
+        +workflow_id: str
+        +status: str
+        +storage_path: str
+        +error: str
+    }
+    
+    %% CLI Classes
+    class PrefectRunner {
+        +run_flow(mode: RunMode, config: Dict, agent_type: str) -> Dict
+        +load_configs(app_config_path: str, system_config_paths: List) -> Dict
+        +format_output(data: Dict, mode: RunMode) -> None
+        +main() -> None
+    }
+    
+    class RunMode {
+        AGENT
+        WORKFLOW
+        SERVICE
+    }
+    
+    %% Relationships
+    BaseAgent <|-- DiscoveryAgent
+    BaseAgent <|-- SolutionDesigner
+    BaseAgent <|-- Coder
+    BaseAgent <|-- AssuranceAgent
+    
+    BaseAgent <|-- SemanticIterator
+    BaseAgent <|-- SemanticExtract
+    BaseAgent <|-- SemanticMerge
+    BaseAgent <|-- AssetManager
+    
+    PrefectWorkflow ..> AgentTaskConfig : creates
+    PrefectWorkflow ..> BaseAgent : uses
+    
+    PrefectRunner ..> ConfigManager : uses
+    PrefectRunner ..> PrefectWorkflow : executes
+    PrefectRunner ..> APIService : starts
+    
+    APIService ..> WorkflowRequest : processes
+    APIService ..> WorkflowResponse : returns
+    APIService ..> PrefectWorkflow : executes
+    
+    PrefectWorkflow ..> Project : operates on
+    Coder ..> Project : modifies
+    DiscoveryAgent ..> Project : analyzes
+```
+
+
+```mermaid
+classDiagram
+    class Orchestrator {
+        -Collection~NetworkComponent~ network
+        +addComponent(component: NetworkComponent)
+        +orchestrate(event: Event)
+    }
+
+    class Event {
+        -String eventId
+        -DateTime timestamp
+        -Object payload
+        -String sagaId
+        +getEventId() String
+        +getPayload() Object
+        +getSagaId() String
+    }
+
+    class NetworkComponent {
+        <<interface>>
+        +execute(event: Event)
+    }
+
+    class Graph {
+        -Collection~Node~ nodes
+        -List~Node~ staticRoute
+        +execute(event: Event)
+        +addNode(node: Node)
+        +setStaticRoute(nodes: List~Node~)
+    }
+
+    class EventBus {
+        -Collection~Node~ nodes
+        -Map~Node, EventFilter~ subscriptions
+        +execute(event: Event)
+        +register(node: Node, filter: EventFilter)
+        +publish(event: Event)
+    }
+
+    class Node {
+        -String address
+        +process(event: Event)
+        +listen(event: Event)
+        +getAddress() String
+    }
+
+    class EventFilter {
+        -List~Condition~ conditions
+        +matches(event: Event) boolean
+    }
+
+    Orchestrator o--> "many" NetworkComponent : contains
+    Graph --|> NetworkComponent : implements
+    EventBus --|> NetworkComponent : implements
+    Graph o--> "many" Node : contains
+    EventBus o--> "many" Node : contains
+    EventBus o--> "many" EventFilter : uses
+    ```
