@@ -1,0 +1,109 @@
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    Refactor the codebase to remove legacy direct workflow implementation in favor of team-based orchestration:
+    
+    The following changes are recommended to refactor the existing codebase, but reevaluate as needed:
+
+    1. Remove the static workflow implementation in `c4h_services/src/intent/impl/prefect/workflows.py` 
+    2. Update all dependent components to use team-based orchestration exclusively
+    3. Update `c4h_services/src/intent/impl/prefect/flows.py` to be a thin wrapper around team orchestration
+    4. Ensure backward compatibility with existing API endpoints
+    5. Simplify configuration handling to focus on team-based execution
+    6. Clean up all direct references to the legacy workflow pattern
+    7. Update the service implementation to only use team-based execution
+    8. Consolidate runner code to remove workflow-specific logic
+    
+    
+    The implementation should respect:
+    
+    1. Agent Design Principles (from Agent_Design_Principles.md):
+      - LLM-First Processing: Keep agent code focused on infrastructure
+      - Single Responsibility: Each component has one clear task
+      - Clear Boundaries: Team, Agent, and Orchestrator responsibilities clearly defined
+      - Minimal Processing: Pass data through to LLM without unnecessary transformation
+      - Observable Behavior: Maintain extensive logging and artifact tracking
+      - Stateless Operation: Agents don't maintain state between operations
+      - Composability: Agents can be chained together
+    
+    2. Config Design Principles (from Config_Design_Principles.md):
+      - Hierarchical Configuration: Follow strict hierarchy for all config
+      - Smart Merge Behavior: Base config provides foundation, override config adds/updates
+      - Separation of Responsibilities: Each component owns its config section
+      - Config Location: Clear hierarchical paths
+      - Config Access: Agents access only their own config section
+    
+    All changes should maintain backward compatibility with existing functionality while adding the new team-based capabilities. The system should be designed to allow gradual migration from the current static workflow to the new team-based approach.
+
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths:
+          - "c4h_services"
+          - "c4h_agents"
+          - "docs/Agent_Design_Principles.md"
+          - "docs/Config_Design_Principles.md"
+          - "docs/Agent_Design_Refinements.md"
+        exclusions:
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+        
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000 # 32k tokens for extended thinking
+        
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+      
+    semantic_iterator:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      extractor_config:
+        mode: "fast"
+        allow_fallback: true
+        
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      retention:
+        max_runs: 10
+        max_days: 30
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+    retry:
+      enabled: true
+      max_attempts: 3
+      initial_delay: 1
+      max_delay: 30
+      backoff_factor: 2
+      retry_on:
+        - "overloaded_error"
+        - "rate_limit_error"
+        - "timeout_error"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
