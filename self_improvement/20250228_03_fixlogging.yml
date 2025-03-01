@@ -1,0 +1,110 @@
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+
+    Refactor the codebase to for ever log statement that is printing a string 
+    i want to be able to truncate that string to 'n' length characters, showing the first 10 characters and dots in the middle " .... " last 20 characters, but only if its being truncated, hence exceeds 40 characters. 
+
+
+    Use a common function that will truncate the string prior to prining.
+    those default values of 10 and 20 should be configurable in the system_config.yml file.
+
+    This has been implemented in the services folder, I want to apply the exact same pattern to the agents folder.
+    i want to use the common logging pattern, but I dont want to create a dependency on agents to services library.
+    agents are independent of services, so I want to create a common logging pattern that can be used by both agents and services.
+
+    Make this change to all the base agent and agent files that print large strings
+    This is to address excessive log dumps
+    do not use __init__ user defined functions, use the common logging pattern.
+
+    
+    The implementation should respect:
+    
+    1. Agent Design Principles (from Agent_Design_Principles.md):
+      - LLM-First Processing: Keep agent code focused on infrastructure
+      - Single Responsibility: Each component has one clear task
+      - Clear Boundaries: Team, Agent, and Orchestrator responsibilities clearly defined
+      - Minimal Processing: Pass data through to LLM without unnecessary transformation
+      - Observable Behavior: Maintain extensive logging and artifact tracking
+      - Stateless Operation: Agents don't maintain state between operations
+      - Composability: Agents can be chained together
+    
+    2. Config Design Principles (from Config_Design_Principles.md):
+      - Hierarchical Configuration: Follow strict hierarchy for all config
+      - Smart Merge Behavior: Base config provides foundation, override config adds/updates
+      - Separation of Responsibilities: Each component owns its config section
+      - Config Location: Clear hierarchical paths
+      - Config Access: Agents access only their own config section
+    
+    All changes should maintain backward compatibility with existing functionality while adding the new team-based capabilities. The system should be designed to allow gradual migration from the current static workflow to the new team-based approach.
+
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths:
+          - "c4h_services"
+          - "c4h_agents"
+          - "docs/Agent_Design_Principles.md"
+        exclusions:
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+        
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000 # 32k tokens for extended thinking
+        
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+      
+    semantic_iterator:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      extractor_config:
+        mode: "fast"
+        allow_fallback: true
+        
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      retention:
+        max_runs: 10
+        max_days: 30
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+    retry:
+      enabled: true
+      max_attempts: 3
+      initial_delay: 1
+      max_delay: 30
+      backoff_factor: 2
+      retry_on:
+        - "overloaded_error"
+        - "rate_limit_error"
+        - "timeout_error"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
