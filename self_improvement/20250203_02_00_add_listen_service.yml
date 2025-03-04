@@ -7,38 +7,18 @@ project:
 intent:
   description: |
     Enhance prefect_runner to support an API service mode while leveraging native Prefect capabilities and existing libraries.
+    prefect runner will support existing workflow mode
+    and new -S for service mode, -P for explicit port otherwise next available port 
 
-    Package Structure Requirements:
-    1. All imports must use absolute paths from project root, following existing pattern:
-        - Use: from c4h_services.src.api.service import app
-        - Use: from c4h_agents.config import deep_merge
-        - Never use relative imports (e.g., from ..src.api.service)
-        -  CRITICAL Import Requirements: Setup import path BEFORE any c4h imports
-        
-        # Setup import path BEFORE any c4h imports
-        root_dir = Path(__file__).parent.parent.parent
-        sys.path.append(str(root_dir))
+    Service mode will behave just like a workflow except that all configuration and project handling will be done via API calls.
 
-        # Only after path setup, import c4h packages
-        from c4h_agents.agents.discovery import DiscoveryAgent
-        from c4h_agents.agents.solution_designer import SolutionDesigner
-        from c4h_agents.agents.coder import Coder
-        [...other c4h imports...]
+    All designs must be constrained by the existing c4h_services design patterns and requirements - read the design principles in the docs folder.
 
-    # 5. Finally import service components
-    from c4h_services.src.api.service import app
-    ```
     2. File Organization:
-        ```
-        c4h_services/
-        ├── src/
-        │   ├── api/
-        │   │   ├── service.py      # FastAPI implementation
-        │   │   └── models.py       # Pydantic models
-        │   └── intent/             # Existing intent service
-        └── examples/
-            └── prefect_runner.py   # CLI and service entry point
-        ```
+        - All new files must be in c4h_services/src/api
+        - Use existing patterns for file organization
+        - Use existing patterns for file naming
+        - Use existing patterns for file content
 
     Design Requirements:
     - Design must comply with docs/Agent_Design_Principles.md
@@ -47,36 +27,6 @@ intent:
     - All new code must use absolute imports
 
     Implementation Requirements:
-
-    1. Add FastAPI API Mode:
-        prefect_runner.py changes:
-        ```python
-        # Imports must use absolute paths
-        from c4h_services.src.api.service import app
-        from c4h_services.src.api.models import WorkflowRequest
-        
-        # Add service mode support
-        parser.add_argument("-S", "--service", action="store_true")
-        parser.add_argument("-P", "--port", type=int, default=8000)
-        
-        if args.service:
-            uvicorn.run(app, host="0.0.0.0", port=args.port)
-            return
-        ```
-
-    2. API Service Implementation:
-        service.py implementation:
-        ```python
-        from c4h_agents.config import deep_merge
-        from c4h_agents.core.project import Project
-        from c4h_services.src.api.models import WorkflowRequest
-        
-        app = FastAPI(
-            title="C4H Workflow Service",
-            description="API for executing C4H workflows",
-            version="0.1.0"
-        )
-        ```
 
     3. API Endpoints:
         POST /api/v1/workflow:
@@ -97,30 +47,6 @@ intent:
             - events: List[Dict]
             - storage_path: Optional[str]
 
-    4. Required Files:
-
-    a. c4h_services/src/api/service.py:
-        - Use absolute imports
-        - FastAPI app definition
-        - Route handlers
-        - Config loading using c4h_agents.config
-        - Project handling using c4h_agents.core.project
-
-    b. c4h_services/src/api/models.py:
-        - Pydantic models
-        - No relative imports
-        - Map to existing types
-        - Input/output validation
-
-    c. c4h_services/examples/prefect_runner.py:
-        - do not loese existing CLI functionality 
-        - Update imports to absolute paths
-        - Add new service mode -p for explicit port otherwise next available port
-        - Log statement saying what port the service is running on
-        - -S for service mode
-        - FastAPI integration
-        - CLI argument updates
-
     Integration Requirements:
     - Use config.deep_merge for configs
     - Use Project model for projects
@@ -136,66 +62,41 @@ intent:
     - Preserve CLI functionality
     - Minimize new code
 
-    Return changes in standard JSON format with file_path, type, description, and complete content.
+    DO NOT CREATE NEW FILES UNLESS REQUIRED, USE EXISTING PATTERNS AND FILES
 
+    DO NOT MAKE ANY CHANGES UNLESS YOU HAVE READ THE DESIGN PRINCIPLES AND UNDERSTAND THE REQUIREMENTS AND CHANGES ARE REQUIRED
 
 llm_config:
   agents:
     discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      temperature: 0
       tartxt_config:
-        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        script_path: "/Users/jim/src/apps/c4h/c4h_agents/skills/tartxt.py"
         input_paths: 
           - "c4h_services"
-          - "docs"
         exclusions: 
           - "**/__pycache__/**"
           - "**/.git/**"
           - "**/*.pyc"
         output_type: "stdout"
 
-    solution_designer:
-#      provider: "anthropic"
-#      model: "claude-3-7-sonnet-20250219"
-      provider: "openai"
-      model: "o3-mini"          
-      temperature: 0
 
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+#      provider: "openai"
+#      model: "o3-mini"          
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000 # 32k tokens for extended thinking  
 
     coder:
-      provider: "openai"
-      model: "o3-mini"        
-#      provider: "anthropic"
-#      model: "claude-3-7-sonnet-20250219"
+#      provider: "openai"
+#      model: "o3-mini"        
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
       temperature: 0
       backup_enabled: true
-
-runtime:
-  workflow:
-    storage:
-      enabled: true
-      root_dir: "workspaces/workflows"
-      format: "yymmdd_hhmm_{workflow_id}"
-      retention:
-        max_runs: 10
-        max_days: 30
-      subdirs:
-        - "events"
-        - "config"
-      error_handling:
-        ignore_storage_errors: true
-        log_level: "ERROR"
-    retry:
-      enabled: true
-      max_attempts: 3
-      initial_delay: 1
-      max_delay: 30
-      backoff_factor: 2
-      retry_on:
-        - "overloaded_error"
-        - "rate_limit_error"
-        - "timeout_error"
-
-logging:
-  level: "INFO"
-  format: "structured"
-  agent_level: "DEBUG"

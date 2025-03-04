@@ -319,7 +319,7 @@ flowchart TB
     Coder -->|Before Changes| BS
 ```
 
-``` mermaid
+```mermaid
 flowchart TB
 
     subgraph Config["Configuration System"]
@@ -333,7 +333,7 @@ flowchart TB
 
 ```
 
-``` mermaid
+```mermaid
 classDiagram
     %% Core Agent Base Classes
     class BaseAgent {
@@ -492,4 +492,45 @@ classDiagram
     PrefectWorkflow ..> Project : operates on
     Coder ..> Project : modifies
     DiscoveryAgent ..> Project : analyzes
+```
+
+```mermaid
+stateDiagram-v2
+  [*] --> Initialized
+  Initialized --> ExtractingInformation : semantic_fast_extractor
+  ExtractingInformation --> DesigningSolution : solution_designer
+  DesigningSolution --> TrackingEvent : BaseLineage
+  TrackingEvent --> FileStorage : Store in file backend
+  TrackingEvent --> MarquezStorage : Store in Marquez backend
+  FileStorage --> [*]
+  MarquezStorage --> [*]
+  
+  state ExtractingInformation {
+    [*] --> ParsingInput
+    ParsingInput --> ExtractingObjects
+    ExtractingObjects --> [*]
+  }
+  
+  state DesigningSolution {
+    [*] --> GeneratingModifications
+    GeneratingModifications --> StoringDiffs
+    StoringDiffs --> [*]
+  }
+  
+  state TrackingEvent {
+    [*] --> CreatingLineageEvent
+    CreatingLineageEvent --> StoringEvent
+    StoringEvent --> [*]
+  }
+  
+  state FileStorage {
+    [*] --> WritingToFile
+    WritingToFile --> [*]
+  }
+  
+  state MarquezStorage {
+    [*] --> SendingEvent
+    SendingEvent --> RetryingOnFailure
+    RetryingOnFailure --> [*]
+  }
 ```

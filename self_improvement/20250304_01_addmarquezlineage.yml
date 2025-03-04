@@ -1,0 +1,106 @@
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+
+    Refactor the BaseLineage implementation to support sending lineage data to an existing Marquez OpenLineage service in addition to the current file-based storage.
+
+    Currently, the BaseLineage class in c4h_agents/agents/base_lineage.py writes lineage data to files. We want to add the capability to:
+    1. Continue writing to files (current behavior)
+    2. Send lineage data to a Marquez OpenLineage service API
+    3. Support writing to both destinations simultaneously based on configuration
+
+    Key requirements:
+    1. Preserve all existing lineage data generation logic - only modify where the data is sent
+    2. Use the OpenLineage client that's already imported but not fully utilized
+    3. Make Marquez endpoint, authentication, and retry settings configurable
+    4. Maintain full backward compatibility with existing file-based output
+    5. Handle errors gracefully so that failure in one output method doesn't affect the other
+
+    Configuration should support the following structure in system_config.yml:
+    ```
+    llm_config:
+      agents:
+        lineage:
+          enabled: true
+          namespace: "c4h_agents"
+          backends:
+            file:
+              enabled: true
+              path: "workspaces/lineage"
+            marquez:
+              enabled: false  # Can be enabled via config
+              url: "http://localhost:5000"
+              auth:
+                type: "api_key"  # none, api_key, bearer
+                api_key: "{ENV:MARQUEZ_API_KEY}"
+              transport:
+                timeout: 30
+                retries: 3
+                backoff: true
+    ```
+
+    Implementation approach:
+    1. Update the configuration handling to support multiple backends
+    2. Keep the file writing logic mostly as-is for backward compatibility
+    3. Complete and fix the existing `_emit_marquez_event` method that's already defined
+    4. Add proper retry and error handling for the Marquez API communication
+    5. Update the `track_llm_interaction` method to use both backends when enabled
+
+    The existing OpenLineage imports and partial implementation should be used and expanded, not replaced.
+
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths:
+          - "c4h_services"
+          - "c4h_agents"
+          - "docs/Agent_Design_Principles.md"
+        exclusions:
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+        
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000 # 32k tokens for extended thinking
+        
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      retention:
+        max_runs: 10
+        max_days: 30
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+    retry:
+      enabled: true
+      max_attempts: 3
+      initial_delay: 1
+      max_delay: 30
+      backoff_factor: 2
+      retry_on:
+        - "overloaded_error"
+        - "rate_limit_error"
+        - "timeout_error"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
