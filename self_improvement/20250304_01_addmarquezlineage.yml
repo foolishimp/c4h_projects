@@ -5,51 +5,71 @@ project:
 intent:
   description: |
 
-    Refactor the BaseLineage implementation to support sending lineage data to an existing Marquez OpenLineage service in addition to the current file-based storage.
+intent:
+  description: |
+        Refactor the BaseLineage implementation in c4h_agents/agents/base_lineage.py to support sending lineage data to multiple backend services including Marquez OpenLineage service, while maintaining the existing file-based storage.
 
-    Currently, the BaseLineage class in c4h_agents/agents/base_lineage.py writes lineage data to files. We want to add the capability to:
-    1. Continue writing to files (current behavior)
-    2. Send lineage data to a Marquez OpenLineage service API
-    3. Support writing to both destinations simultaneously based on configuration
+        Current State:
+        - The code already has OpenLineage client imports with fallback handling
+        - There's an empty `_emit_marquez_event` method stub 
+        - File-based lineage tracking is fully implemented
+        - The configuration structure doesn't support multiple backends
+        - The code has critical functionality for extracting run_id from config in the _extract_run_id method, which must be preserved as-is
 
-    Key requirements:
-    1. Preserve all existing lineage data generation logic - only modify where the data is sent
-    2. Use the OpenLineage client that's already imported but not fully utilized
-    3. Make Marquez endpoint, authentication, and retry settings configurable
-    4. Maintain full backward compatibility with existing file-based output
-    5. Handle errors gracefully so that failure in one output method doesn't affect the other
+        Required Changes:
+        1. Update the configuration handling to support this hierarchical structure with multiple backends:
+          ```yaml
+          llm_config:
+            agents:
+              lineage:
+                enabled: true
+                namespace: "c4h_agents"
+                backends:
+                  file:
+                    enabled: true
+                    path: "workspaces/lineage"
+                  marquez_primary:  # Backend names can be customized as long as they start with 'marquez'
+                    enabled: false  # Can be enabled via config
+                    url: "http://localhost:5000"
+                    auth:
+                      type: "api_key"  # none, api_key, bearer
+                      api_key: "{ENV:MARQUEZ_API_KEY}"
+                    transport:
+                      timeout: 30
+                      retries: 3
+                      backoff: true
+                  marquez_secondary:  # Support for multiple Marquez instances
+                    enabled: false
+                    url: "http://other-server:5000"
+                    auth:
+                      type: "bearer"
+                      token: "{ENV:MARQUEZ_TOKEN}"
+                    transport:
+                      timeout: 30
 
-    Configuration should support the following structure in system_config.yml:
-    ```
-    llm_config:
-      agents:
-        lineage:
-          enabled: true
-          namespace: "c4h_agents"
-          backends:
-            file:
-              enabled: true
-              path: "workspaces/lineage"
-            marquez:
-              enabled: false  # Can be enabled via config
-              url: "http://localhost:5000"
-              auth:
-                type: "api_key"  # none, api_key, bearer
-                api_key: "{ENV:MARQUEZ_API_KEY}"
-              transport:
-                timeout: 30
-                retries: 3
-                backoff: true
-    ```
+            2. Implement the `_emit_marquez_event` method to:
+              - Transform LineageEvent into OpenLineage format
+              - Support different authentication methods (none, api_key, bearer)
+              - Add proper error handling with logging
+              - Apply the retry settings from configuration
 
-    Implementation approach:
-    1. Update the configuration handling to support multiple backends
-    2. Keep the file writing logic mostly as-is for backward compatibility
-    3. Complete and fix the existing `_emit_marquez_event` method that's already defined
-    4. Add proper retry and error handling for the Marquez API communication
-    5. Update the `track_llm_interaction` method to use both backends when enabled
+            3. Update the `track_llm_interaction` method to:
+              - Use both backends when they're enabled
+              - Ensure failure in one backend doesn't affect the other
+              - Maintain backward compatibility if only file backend is configured
 
-    The existing OpenLineage imports and partial implementation should be used and expanded, not replaced.
+            4. Add a method to resolve environment variables in configuration values (e.g., {ENV:MARQUEZ_API_KEY})
+
+            5. Add comprehensive logging for all operations, especially failures
+            Constraints:
+            - Preserve all existing lineage data generation logic
+            - Don't modify the LineageEvent data structure
+            - Use the OpenLineage client that's already imported
+            - Follow the agent design principles (minimal agent logic, clear boundaries)
+            - Ensure graceful degradation if Marquez is unavailable
+            - Don't lose any data even if one backend fails
+
+            Implementation should be complete and ready for production use, with proper error handling, retries, and configuration validation.
 
 llm_config:
   agents:
