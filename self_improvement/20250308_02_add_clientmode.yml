@@ -1,0 +1,80 @@
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"
+  workspace_root: "workspaces"
+intent:
+  description: |
+    Fix the inconsistency between direct workflow execution and API service execution by ensuring the Orchestrator reloads teams when configuration changes.
+    
+    The current issue is:
+    1. In direct workflow mode, teams are created with complete configuration
+    2. In API mode, teams are created once at startup with empty configuration and never refreshed
+    3. This causes tartxt_config to be empty in API mode, resulting in "No input paths configured" errors
+    
+    Required changes:
+    
+    1. Modify Orchestrator.execute_workflow() in c4h_services/src/orchestration/orchestrator.py:
+       - Add code at the beginning to check if context["config"] differs from self.config
+       - If different, update self.config with context["config"]
+       - Recreate self.config_node = create_config_node(self.config)
+       - Clear and reload teams (self.teams = {} followed by self._load_teams())
+       - Add a log message: "orchestrator.teams_reloaded_with_updated_config"
+    
+    2. Update API service.py run_workflow handler:
+       - Ensure the full prepared_config is included in the context as context["config"]
+       - This is critical to trigger the team reload mechanism in execute_workflow
+    
+    The changes must be minimal and focused on ensuring the Orchestrator reloads teams when configuration changes. No changes to the initialize_workflow function or other parts of the codebase are needed.
+    
+    Implementation Notes:
+    - Add the config check logic at the very beginning of execute_workflow before any other processing
+    - Use deep comparison of configs to avoid unnecessary reloads
+    - Ensure API handler includes prepared_config in context
+    - Maintain all existing functionality in both methods
+
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths:
+          - "c4h_services"
+          - "c4h_agents"
+          - "docs/Agent_Design_Principles.md"
+        exclusions:
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000 # 32k tokens for extended thinking
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+      retry:
+        enabled: true
+        max_attempts: 3
+        initial_delay: 1
+        max_delay: 30
+        backoff_factor: 2
+        retry_on:
+          - "overloaded_error"
+          - "rate_limit_error"
+          - "timeout_error"
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

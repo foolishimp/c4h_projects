@@ -1,0 +1,94 @@
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"
+  workspace_root: "workspaces"
+intent:
+  description: |
+    Enhance prefect_runner.py to support a client mode that can connect to a running service instance while maintaining existing functionality.
+    
+    The enhancements will:
+    - Maintain the existing workflow mode functionality
+    - Keep the service mode with -S flag and -P for port specification
+    - Add a new client mode that connects to a running service
+    - Use the existing REST API endpoints for communication
+    - Ensure configuration merging happens on the server side, not client side
+    
+    Implementation requirements:
+    1. CLI Arguments:
+       - Add "client" mode option
+       - Support --host parameter (default: localhost)
+       - Reuse existing -P port parameter
+       - Support same config parameters as workflow mode
+       
+    2. Client Functions:
+       - Create HTTP client functions to communicate with service
+       - Support submission of workflow requests
+       - Implement status checking and result polling
+       - Handle connection errors gracefully
+       
+    3. API Usage:
+       - Use existing POST /api/v1/workflow endpoint for submissions
+       - Use existing GET /api/v1/workflow/{workflow_id} for status checks
+       - Pass client configuration to server for merging
+       
+    4. Workflow Completion Detection:
+       - the service upon submission of the request shoudl return a runid
+       - client should print the runid and then exit
+       
+    5. Output Format:
+       - Maintain consistent output between local and remote execution
+       - Display workflow results in same format as workflow mode
+       - Provide clear visual indication of completion status
+       - Format results in a readable, structured manner
+       
+    All implementations must follow existing design patterns and principles.
+    No changes to c4h_agents should be made.
+    Use absolute imports and follow established coding patterns.
+    Leverage existing functions where possible to minimize new code.
+    
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths:
+          - "c4h_services"
+          - "c4h_agents"
+          - "docs/Agent_Design_Principles.md"
+        exclusions:
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000 # 32k tokens for extended thinking
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+      retry:
+        enabled: true
+        max_attempts: 3
+        initial_delay: 1
+        max_delay: 30
+        backoff_factor: 2
+        retry_on:
+          - "overloaded_error"
+          - "rate_limit_error"
+          - "timeout_error"
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

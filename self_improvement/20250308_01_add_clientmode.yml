@@ -1,0 +1,80 @@
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"
+  workspace_root: "workspaces"
+intent:
+  description: |
+    Create a consistent workflow initialization function in the core services layer that ensures uniform behavior across all entry points, including direct workflow execution and client-server API calls.
+    
+    The implementation should:
+    1. Create initialize_workflow function in the orchestration or intent service layer
+    2. Ensure all entry points (prefect_runner and API service) utilize this common function
+    3. Fix configuration issues, particularly around tartxt_config defaults
+    4. Standardize workflow_run_id generation and parameter handling
+    
+    Implementation requirements:
+    1. Create initialize_workflow in c4h_services/src/orchestration/orchestrator.py:
+      - Takes project_path, intent_desc, and config as parameters
+      - Applies all necessary default configurations
+      - Returns a fully prepared configuration ready for workflow execution
+      
+    2. Update prefect_runner.py:
+      - Remove any initialization logic unique to prefect_runner
+      - Call the centralized initialize_workflow function from orchestrator
+      
+    3. Update service.py API handler:
+      - Ensure it uses the same initialization function as prefect_runner
+      - Maintain consistent parameter handling between direct and API execution
+      
+    4. Add explicit defaults:
+      - Ensure tartxt_config always includes input_paths (["./"])
+      - Fix key name mismatches (script_base_path vs script_path)
+      
+    The refactoring should ensure that workflows execute identically whether triggered directly or via the API service, with all default configurations properly applied in both cases.
+    
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
+        input_paths:
+          - "c4h_services"
+          - "c4h_agents"
+          - "docs/Agent_Design_Principles.md"
+        exclusions:
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+        output_type: "stdout"
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000 # 32k tokens for extended thinking
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+      retry:
+        enabled: true
+        max_attempts: 3
+        initial_delay: 1
+        max_delay: 30
+        backoff_factor: 2
+        retry_on:
+          - "overloaded_error"
+          - "rate_limit_error"
+          - "timeout_error"
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
