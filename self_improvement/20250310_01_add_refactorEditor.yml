@@ -1,0 +1,126 @@
+project:
+  path: "/Users/jim/src/apps/c4h_editor"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    Complete the frontend implementation for the C4H Editor to fully support WorkOrder management and 
+    C4H service integration, building on the existing backend changes.
+    
+    The implementation will:
+    - Create frontend components for WorkOrder editing and management
+    - Implement job tracking and status visualization
+    - Add submission functionality for work orders to the C4H service
+    - Integrate with existing Prompt functionality while maintaining backward compatibility
+    
+    Implementation requirements:
+    1. WorkOrder Editing:
+       - Extend existing PromptEditor with WorkOrder-specific fields
+       - Add YAML configuration editing support
+       - Implement conversion from Prompts to WorkOrders
+       
+    2. Job Management:
+       - Create job listing view with filtering and sorting
+       - Implement job details view with status tracking
+       - Add job action controls (submit, cancel, retry)
+       - Implement real-time status updates
+       
+    3. Navigation & Integration:
+       - Add routes for job and work order screens
+       - Create navigation links between components
+       - Implement submission flow from WorkOrder to Job
+       - Maintain backward compatibility with prompt functionality
+       
+    4. API Integration:
+       - Connect frontend to existing job API endpoints
+       - Implement hooks for work order and job operations
+       - Add proper loading states and error handling
+       - Support real-time status checking
+       
+    Follow the project's design principles of template configuration over code, clear component 
+    boundaries, and minimal agent logic. Ensure consistent error handling and logging patterns.
+
+    implementation_guidelines:
+      phases:
+        - name: "TypeScript Interfaces"
+          description: "Create TypeScript interfaces for WorkOrder and Job models"
+          priority: 1
+        - name: "API Hooks"
+          description: "Implement hooks for interacting with WorkOrder and Job APIs"
+          priority: 2
+        - name: "WorkOrder Editing"
+          description: "Create WorkOrderEditor component with YAML support"
+          priority: 3
+        - name: "Job Management UI"
+          description: "Implement job listing and details components"
+          priority: 4
+        - name: "Navigation & Integration"
+          description: "Connect all components and implement submission flow"
+          priority: 5
+        - name: "Polish & Usability"
+          description: "Add status indicators, notifications, and improve UX"
+          priority: 6
+      
+      key_files:
+        - path: "frontend/src/types/workorder.ts"
+          description: "TypeScript interfaces for WorkOrder model"
+        - path: "frontend/src/types/job.ts"
+          description: "TypeScript interfaces for Job model"
+        - path: "frontend/src/hooks/useJobApi.ts"
+          description: "Hook for job CRUD operations"
+        - path: "frontend/src/hooks/useWorkOrderApi.ts"
+          description: "Hook for work order operations"
+        - path: "frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx"
+          description: "Component for editing work orders with YAML support"
+        - path: "frontend/src/components/JobsList/JobsList.tsx"
+          description: "Component for listing and filtering jobs"
+        - path: "frontend/src/components/JobDetails/JobDetails.tsx"
+          description: "Component for viewing job status and results"
+        - path: "frontend/src/components/common/Navigation.tsx"
+          description: "Navigation component with links to all sections"
+        - path: "frontend/src/App.tsx"
+          description: "Main application with updated routes"
+
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        input_paths:
+          - "frontend/src/components"
+          - "frontend/src/hooks"
+          - "frontend/src/types"
+          - "frontend/src/App.tsx"
+          - "frontend/src/index.tsx"
+        exclusions:
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+          - "**/node_modules/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0.5
+
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      subdirs:
+        - "events"
+        - "config"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

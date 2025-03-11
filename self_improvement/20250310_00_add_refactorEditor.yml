@@ -1,0 +1,122 @@
+project:
+  path: "/Users/jim/src/apps/c4h_editor"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    Refactor the C4H Editor to support WorkOrder management and C4H service integration while maintaining existing functionality.
+    
+    The refactoring will:
+    - Keep Git-based prompt management (existing functionality)
+    - Transform prompts to work orders with additional fields
+    - Add service integration for submitting work orders as jobs
+    - Add job tracking and status management
+    - Provide a job history view
+    
+    Implementation requirements:
+    1. Model Changes:
+       - Extend Prompt model to WorkOrder with fields for asset, intent, goal
+       - Create Job model for tracking submissions to C4H service
+       - Maintain backwards compatibility with existing prompts
+       
+    2. Backend Enhancements:
+       - Create C4H service client for API integration
+       - Add job repository for tracking submissions
+       - Extend prompt repository to support work orders
+       - Add API endpoints for job management
+       
+    3. Frontend Enhancements:
+       - Add WorkOrder specialized editing with YAML support
+       - Create job listing and details views
+       - Add submission functionality to editors
+       - Add navigation between components
+       
+    4. Simplifications:
+       - Use a single configuration file rather than parameterization
+       - Focus on core submission and status checking
+       - Skip workflow management features
+       
+    Maintain backward compatibility with existing functionality.
+    Follow the project's design principles of template configuration over code and clear component boundaries.
+    Use consistent error handling and logging patterns throughout.
+
+    implementation_guidelines:
+      phases:
+        - name: "Model Extensions"
+          description: "Extend data models for WorkOrder and Job"
+          priority: 1
+        - name: "Backend Services"
+          description: "Implement C4H service client and job repository"
+          priority: 2
+        - name: "API Extensions"
+          description: "Add endpoints for job submission and status"
+          priority: 3
+        - name: "Frontend Components" 
+          description: "Create job views and extend WorkOrder editing"
+          priority: 4
+        - name: "Integration Testing"
+          description: "Test end-to-end workflow"
+          priority: 5
+      
+      key_files:
+        - path: "backend/models/workorder.py"
+          description: "New file for WorkOrder model"
+        - path: "backend/models/job.py"
+          description: "New file for Job model"
+        - path: "backend/services/c4h_service.py"
+          description: "New service for C4H API integration"
+        - path: "backend/services/job_repository.py"
+          description: "New repository for job management"
+        - path: "backend/api/routes/jobs.py"
+          description: "New routes for job management"
+        - path: "frontend/src/components/JobsList/JobsList.tsx"
+          description: "New component for job listing"
+        - path: "frontend/src/components/JobDetails/JobDetails.tsx"
+          description: "New component for job details"
+
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        input_paths:
+          - "frontend/src/components"
+          - "frontend/src/hooks"
+          - "frontend/src/types"
+          - "frontend/src/App.tsx"
+          - "frontend/src/index.tsx"
+          - "backend/api/routes"
+          - "backend/models"
+          - "backend/services"
+          - "backend/main.py"
+          - "backend/dependencies.py"
+          - "backend/config.py"
+        exclusions:
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+          - "**/node_modules/**"
+          - "**/*.cpython-*.pyc"
+        output_type: "stdout"
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000 # 32k tokens for extended thinking
+
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      subdirs:
+        - "events"
+        - "config"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+

@@ -1,3 +1,5 @@
+### Example of a LLM configuration file for a specific work order
+
 project:
   path: "/Users/jim/src/apps/c4h_ai_dev"
   workspace_root: "workspaces"

@@ -1,0 +1,114 @@
+project:
+  path: "/Users/jim/src/apps/c4h_editor"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    Fix the C4H Editor frontend application that's currently showing a blank screen across browsers. 
+    The backend service is running correctly at http://localhost:8000, but the frontend fails to render properly.
+    
+    The main issues to fix include:
+    1. Environment variable configuration mismatch - hooks use incompatible patterns
+    2. UI framework conflicts between Material UI and Chakra UI
+    3. Missing error boundaries and graceful failure modes
+    4. API endpoint configuration inconsistencies
+    
+    Implementation requirements:
+    1. Fix environment variable usage:
+      - Standardize on Vite's import.meta.env pattern
+      - Create proper .env.local file configuration
+      - Ensure API hooks use consistent URL patterns
+    
+    2. Resolve UI framework conflicts:
+      - Simplify the Navigation component
+      - Ensure consistent component rendering
+      - Add fallback components when data is unavailable
+    
+    3. Add proper error handling:
+      - Implement React Error Boundaries
+      - Add diagnostic pages and tools
+      - Ensure component failures don't crash the entire app
+      - Add graceful UI fallbacks when API calls fail
+    
+    4. Ensure consistent routing:
+      - Verify React Router DOM implementation
+      - Fix component mounting in routes
+    
+    Maintain all existing functionality while ensuring the application renders properly.
+    Follow the project's design principles of clear component boundaries and separation of concerns.
+
+    implementation_guidelines:
+      phases:
+        - name: "Environment Configuration"
+          description: "Fix environment variables and API URL configuration"
+          priority: 1
+        - name: "UI Framework Resolution"
+          description: "Resolve conflicts between Material UI and Chakra UI"
+          priority: 2
+        - name: "Error Handling"
+          description: "Add error boundaries and graceful fallbacks"
+          priority: 3
+        - name: "Routing Fixes"
+          description: "Ensure proper component mounting in routes"
+          priority: 4
+        - name: "Testing"
+          description: "Verify fixes across different browsers"
+          priority: 5
+          
+      key_files:
+        - path: "frontend/.env.local"
+          description: "New file for environment variables"
+        - path: "frontend/src/hooks/useJobApi.ts"
+          description: "Update to use Vite environment variables"
+        - path: "frontend/src/hooks/useWorkOrderApi.ts"
+          description: "Update to use Vite environment variables"
+        - path: "frontend/src/components/common/Navigation.tsx"
+          description: "Simplify to avoid UI framework conflicts"
+        - path: "frontend/src/App.tsx"
+          description: "Add error boundaries and fix routing"
+        - path: "frontend/src/debug.js"
+          description: "New file for debugging tools"
+          
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        input_paths:
+          - "frontend/src/components"
+          - "frontend/src/hooks"
+          - "frontend/src/types"
+          - "frontend/src/App.tsx"
+          - "frontend/src/index.tsx"
+        exclusions:
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+          - "**/node_modules/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0.5
+
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      subdirs:
+        - "events"
+        - "config"
+
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
