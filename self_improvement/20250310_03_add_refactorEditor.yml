@@ -1,0 +1,122 @@
+# C4H Editor Frontend Refactoring Work Order
+
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor"
+  workspace_root: "workspaces"
+
+# Intent description (the actual work order)
+intent:
+  description: |
+    Refactor the C4H Editor frontend codebase to resolve TypeScript errors, fix layout issues, 
+    improve component architecture, and ensure adherence to the agent design principles.
+    
+    Read the documents in the doc folder to understand the backend service that the editor provides functionality over
+    Specifically, read the WorkOrder_Design_Guide the purpose of the editor is to create and config and manage work orders
+
+    Goal:
+    Create a stable, error-free frontend application with proper TypeScript integration, 
+    consistent UI framework usage, and a fixed layout where the sidebar doesn't obscure the main content.
+    
+    Required Changes:
+    1. Fix missing TypeScript files and references
+    2. Resolve dependency and type declaration issues
+    3. Address React scope and JSX errors
+    4. Fix the sidebar layout issue that obscures the main content
+    5. Clean up unused imports and variables
+    6. Standardize UI framework usage (choose either Material UI or Chakra UI)
+    7. Improve API configuration management
+    
+    Specific Errors to Fix:
+    - Missing TypeScript files: Multiple errors indicate files not found but referenced in tsconfig.json
+      * Missing PromptEditor/* components (ParameterPanel.tsx, PromptEditor.tsx, TestRunner.tsx, VersionControl.tsx)
+      * Missing PromptLibrary/PromptLibrary.tsx
+      * Missing common components (DiffViewer.tsx, TimeAgo.tsx)
+      * Missing hooks and types (usePromptApi.ts, prompt.ts)
+    
+    - Missing tsconfig.node.json file referenced in main tsconfig.json
+    
+    - Missing type declarations: Cannot find module errors for:
+      * 'react', 'react-dom/client', 'react-router-dom'
+      * '@mui/material', '@mui/icons-material'
+      * 'axios'
+      * './types/job' and other local imports
+    
+    - React scope issues: Multiple "This JSX tag requires 'React' to be in scope" errors
+    
+    - Unused imports: Multiple "is declared but its value is never read" warnings
+    
+    - Layout issue: Sidebar is hiding the main screen, main screen needs to be scaled so it's visible
+    
+    Implementation Requirements:
+    - Restore or recreate all missing TypeScript files
+    - Update package.json with required dependencies
+    - Create valid tsconfig.node.json file
+    - Fix React imports for JSX components
+    - Modify layout CSS to prevent sidebar overlap - update Navigation.tsx to adjust its width, position and z-index
+    - Remove unused imports and variables
+    - Choose one primary UI framework (recommend using Material UI as it's more prevalent in the codebase)
+    - Create a centralized API configuration module
+    
+    Design Principles to Follow:
+    - Single Responsibility: Each component has one clear, focused task
+    - Minimal Agent Logic: Keep component code focused on infrastructure concerns
+    - Template Configuration Over Code: Move configuration to external files
+    - Clear Component Boundaries: Well-defined interfaces between components
+    - Explicit Over Implicit: Clear props and state management
+    - Logging for Visibility: Debug logging at key points
+    
+    Files to Modify:
+    - Missing TypeScript files identified in error logs
+    - tsconfig.json and tsconfig.node.json
+    - component files with React scope issues
+    - Navigation.tsx and related layout components
+    - API hook files (usePromptApi.ts, useJobApi.ts, useWorkOrderApi.ts)
+
+# LLM configuration
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        input_paths:
+          - "frontend/src"
+          - "frontend/*.*"
+          - "/Users/jim/src/apps/c4h/docs"
+        exclusions:
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+          - "**/node_modules/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+
+# Backup configuration
+backup:
+  enabled: true
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

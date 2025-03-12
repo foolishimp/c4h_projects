@@ -1,0 +1,181 @@
+# C4H Editor Refactoring Fixes Work Order
+
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor"
+  workspace_root: "workspaces"
+
+# Intent description (the actual work order)
+intent:
+  description: |
+    # C4H Editor - Prompt to WorkOrder Refactoring Fixes
+
+    ## Goal:
+    Fix the incomplete prompt-to-workorder refactoring in the C4H Editor codebase, addressing specific errors that prevent the application from running. This work order addresses missing class definitions, duplicate configuration entries, and import issues throughout the codebase.
+
+    ## Context
+    The original refactoring was meant to rename all "prompt" concepts to "workorder", but several issues remain:
+    1. Missing class definitions (e.g., `WorkOrderTestCase`)
+    2. Duplicate API configuration keys in frontend code
+    3. Incomplete import updates across multiple files
+    4. Partially refactored API routes
+
+    ## Required Changes
+
+    ### Backend Model Fixes
+    1. Update `backend/models/workorder.py` to add the missing `WorkOrderTestCase` class:
+       - Add class definition that matches the original `PromptTestCase` from prompt.py
+       - Ensure proper imports and type annotations
+       - Validate model structure matches expected usage in other files
+
+    ### API Routes Fixes
+    1. Complete the refactoring of `backend/api/routes/workorders.py`:
+       - Fix all imports to reference `workorder` instead of `prompt` models
+       - Update all class references (e.g., `PromptCreateRequest` → `WorkOrderCreateRequest`)
+       - Ensure all route handlers are properly renamed
+       - Verify response models use workorder terminology
+       - Fix any type annotations or validation logic
+
+    ### Frontend Configuration Fixes
+    1. Fix duplicate entries in `frontend/src/config/api.ts`:
+       - Remove duplicate `WORKORDERS` and `WORKORDER` keys
+       - Organize endpoints logically, separating workorder and job endpoints
+       - Add clear comments to identify endpoint purposes
+       - Add a legacy section for any backward compatibility needs
+
+    ### Import Resolution Across Codebase
+    1. Fix import statements throughout the codebase:
+       - Update all imports in `backend/main.py` 
+       - Fix imports in `backend/dependencies.py`
+       - Update references in `backend/services/lineage_tracker.py`
+       - Check all test files for correct imports
+
+    ### Execution Steps
+    1. First, fix the model definitions to ensure base classes exist
+    2. Update the API route files to use correct imports and classes
+    3. Fix frontend configuration to eliminate duplicates
+    4. Systematically test each imported module to ensure proper resolution
+    5. Test the application startup to verify fixes resolve the import errors
+
+    ## Detailed Implementation Plan
+
+    ### 1. Fix `backend/models/workorder.py`
+
+    Add the following class definition after the WorkOrder class:
+    ```python
+    class WorkOrderTestCase(BaseModel):
+        """Test case for a workorder with inputs and expected outputs."""
+        name: str
+        parameters: Dict[str, Any]
+        expected_output: Optional[str] = None
+        metadata: Dict[str, Any] = Field(default_factory=dict)
+    ```
+
+    ### 2. Fix `frontend/src/config/api.ts`
+
+    Replace the endpoint definitions with:
+    ```typescript
+    export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+
+    export const API_ENDPOINTS = {
+      // Health check
+      HEALTH: `${API_BASE_URL.replace(/\/api\/v1$/, "")}/health`,
+      
+      // WorkOrder endpoints
+      WORKORDERS: `${API_BASE_URL}/workorders`,
+      WORKORDER: (id: string) => `${API_BASE_URL}/workorders/${id}`,
+      WORKORDER_HISTORY: (id: string) => `${API_BASE_URL}/workorders/${id}/history`,
+      WORKORDER_DIFF: (id: string) => `${API_BASE_URL}/workorders/${id}/diff`,
+      WORKORDER_RENDER: (id: string) => `${API_BASE_URL}/workorders/${id}/render`,
+      WORKORDER_TEST: (id: string) => `${API_BASE_URL}/workorders/${id}/test`,
+      WORKORDER_CLONE: (id: string) => `${API_BASE_URL}/workorders/${id}/clone`,
+      
+      // Job endpoints
+      JOBS: `${API_BASE_URL}/jobs`,
+      JOB: (id: string) => `${API_BASE_URL}/jobs/${id}`,
+      JOB_CANCEL: (id: string) => `${API_BASE_URL}/jobs/${id}/cancel`,
+      JOB_LOGS: (id: string) => `${API_BASE_URL}/jobs/${id}/logs`,
+    };
+    ```
+
+    ### 3. Fix `backend/dependencies.py`
+
+    Ensure all repository references use workorder terminology:
+    ```python
+    def get_workorder_repository():
+        """Get or create a workorder repository instance."""
+        global _prompt_repository  # This variable name might need updating
+        if _prompt_repository is None:
+            repo_path = Path("./data/workorder_repository")
+            repo_path.parent.mkdir(exist_ok=True)
+            _prompt_repository = WorkOrderRepository(str(repo_path))
+        return _prompt_repository
+    ```
+
+    ## Testing Strategy
+
+    1. **Unit Testing**: Verify that the WorkOrderTestCase class is properly defined and functions as expected
+    2. **Integration Testing**: Test API route functionality with the new class definitions
+    3. **End-to-End Testing**: Run the complete application and verify that all components interact correctly
+    4. **Error Testing**: Attempt operations that previously failed to ensure they now succeed
+
+    ## Success Criteria
+
+    1. Application successfully starts without import errors
+    2. Frontend loads without console warnings about duplicate keys
+    3. API endpoints correctly use workorder terminology
+    4. Test cases for workorders can be created and executed
+
+# LLM configuration
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        input_paths:
+          - "backend/"
+          - "frontend/src"
+          - "frontend/*.*"
+        exclusions:
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+          - "**/node_modules/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219" 
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: true
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

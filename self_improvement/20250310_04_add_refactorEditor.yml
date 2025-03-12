@@ -1,0 +1,163 @@
+# C4H Editor Frontend Refactoring Work Order
+
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor"
+  workspace_root: "workspaces"
+
+# Intent description (the actual work order)
+intent:
+  description: |
+    # C4H Editor - Prompt to WorkOrder Refactoring
+
+    ## Goal:
+    Refactor the codebase to completely rename all "prompt" concepts to "workorder", creating a unified system that only deals with WorkOrders. This is a direct rename rather than maintaining both systems in parallel.
+
+    ## Required Changes:
+
+    ### Backend Changes:
+    1. Rename all model files and classes:
+       - Rename `backend/models/prompt.py` to `backend/models/workorder.py`
+       - Update all class names (`Prompt` → `WorkOrder`, `PromptParameter` → `WorkOrderParameter`, etc.)
+       - Ensure the `workorder.py` file properly extends the model with additional fields needed for C4H API integration
+       - Update all imports across the codebase
+
+    2. Refactor repository services:
+       - Rename `backend/services/prompt_repository.py` to `backend/services/workorder_repository.py`
+       - Rename `PromptRepository` class to `WorkOrderRepository`
+       - Update all file paths and storage methods
+       - Adjust any prompt-specific methods to work with workorders
+
+    3. Update API routes:
+       - Rename `backend/api/routes/prompts.py` to `backend/api/routes/workorders.py`
+       - Change route prefix from `/api/v1/prompts` to `/api/v1/workorders` 
+       - Update request/response models and method names
+       - Add any missing endpoints needed for C4H API submission
+
+    4. Update dependencies and configuration:
+       - Rename `get_prompt_repository` to `get_workorder_repository` in `dependencies.py`
+       - Update all references in `main.py` and other files
+       - Ensure configuration paths are updated
+
+    5. Update lineage tracking:
+       - Modify `lineage_tracker.py` to use workorder terminology
+       - Rename tracking methods and event types
+
+    ### Frontend Changes:
+    1. Rename type definitions:
+       - Rename `frontend/src/types/prompt.ts` to `frontend/src/types/workorder.ts`
+       - Update all type interfaces (`PromptMetadata` → `WorkOrderMetadata`, etc.)
+       - Remove any prompt-specific fields that aren't needed
+
+    2. Refactor API hooks:
+       - Rename `frontend/src/hooks/usePromptApi.ts` to `frontend/src/hooks/useWorkOrderApi.ts`
+       - Update all method names and API endpoints
+       - Ensure correct typing throughout
+
+    3. Update components:
+       - Rename `PromptLibrary` folder/components to `WorkOrderLibrary` 
+       - Rename `PromptEditor` folder/components to `WorkOrderEditor`
+       - Update all props, state variables, and method names
+       - Update imports throughout the codebase
+
+    4. Fix API configuration:
+       - Update endpoint constants in `frontend/src/config/api.ts`
+       - Ensure all references point to workorder endpoints
+
+    5. Update navigation and routing:
+       - Change routes from `/prompts/*` to `/workorders/*` in `App.tsx`
+       - Update navigation menu items in `Navigation.tsx`
+       - Fix any route-specific logic
+
+    ### Testing:
+    1. Update test files:
+       - Rename `backend/tests/test_prompt_repository.py` to `backend/tests/test_workorder_repository.py`
+       - Update test class names and method names
+       - Adjust all test assertions and mock data
+
+    ### Implementation Guidelines:
+    - Create a mapping of all files that need to be renamed
+    - For each file, create a comprehensive search-and-replace plan for class/type names
+    - Maintain exact functionality - this is a pure rename refactoring
+    - Ensure backward compatibility for existing data (JSON files should be migrated)
+    - When modifying imports, be careful about circular dependencies
+    - Run tests frequently during the refactoring process
+    - Document any API endpoint changes for client users
+
+    ### Files to Create:
+    - Migration script to rename existing JSON files (if needed)
+    - Updated documentation reflecting workorder terminology
+
+    ### Files to Modify:
+    - All backend Python files with "prompt" references
+    - All frontend TypeScript/React files with "prompt" references
+    - Configuration files and dependency definitions
+    - Test files and fixtures
+
+    ### Implementation Sequence:
+    1. Start with core models
+    2. Update repository services
+    3. Refactor API routes
+    4. Update frontend types and hooks
+    5. Rename and fix components
+    6. Update navigation and routing
+    7. Refactor tests
+    8. Create data migration if needed
+    9. Test the full system end-to-end
+
+    This refactoring should result in a clean, consistent system that uses workorder terminology throughout, enabling direct submission to the C4H API while maintaining all existing functionality.
+
+# LLM configuration
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        input_paths:
+          - "backend/"
+          - "frontend/src"
+          - "frontend/*.*"
+          - "/Users/jim/src/apps/c4h/docs"
+        exclusions:
+          - "**/__pycache__/**"
+          - "**/.git/**"
+          - "**/*.pyc"
+          - "**/node_modules/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219" 
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: true
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
