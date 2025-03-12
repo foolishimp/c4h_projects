@@ -1,0 +1,213 @@
+# C4H Editor UI Refactoring Work Order
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor"
+  workspace_root: "workspaces"
+
+# Intent description (the actual work order)
+intent:
+  description: |
+    # C4H Editor - UI Component Complete Refactoring
+
+    ## Goal
+    Complete the UI refactoring from Prompt to WorkOrder paradigm by systematically addressing all type errors, component mismatches, and API integration issues in the frontend codebase.
+
+    ## Context
+    The application has undergone a partial refactoring from "Prompt" to "WorkOrder" terminology and data structures. While the backend components have been mostly updated, the frontend still has significant issues:
+    
+    1. Components designed for Prompt data models are being used with WorkOrder data
+    2. Type incompatibilities between WorkOrder and Prompt models cause TypeScript errors
+    3. API hooks (useWorkOrderApi, useJobApi) are not properly implemented or returning expected structures
+    4. Missing or incorrect imports and exports in configuration files
+    5. Date vs string type inconsistencies in WorkOrder models
+
+    ## Required Changes
+
+    ### 1. API Configuration and Hooks
+    1. Fix `frontend/src/config/api.ts`:
+       - Ensure `apiClient` is properly exported
+       - Organize endpoints logically, separating workorder and job endpoints
+       - Remove any duplicate definitions
+
+    2. Update `frontend/src/hooks/useWorkOrderApi.ts`:
+       - Complete implementation of all WorkOrder methods
+       - Ensure consistent types aligned with WorkOrder models
+       - Fix import statements to reference correct modules
+
+    3. Update `frontend/src/hooks/useJobApi.ts`:
+       - Ensure the hook exposes `jobs` and `submitJob` properties
+       - Align return types with what App.tsx expects
+       - Fix any type inconsistencies
+
+    ### 2. Component Migration
+    1. Create WorkOrder-specific UI components:
+       - Create `WorkOrderMetadataPanel.tsx` based on PromptMetadataPanel
+       - Create `WorkOrderParameterPanel.tsx` based on PromptParameterPanel
+       - Create `WorkOrderTestRunner.tsx` based on TestRunner
+       - Create `WorkOrderVersionControl.tsx` based on VersionControl
+
+    2. Update type definitions:
+       - Adjust `frontend/src/types/workorder.ts` to fix Date vs string inconsistencies
+       - Ensure WorkOrderParameter.type is compatible with ParameterType enum
+       - Add any missing type definitions from error messages
+
+    3. Update WorkOrderEditor.tsx:
+       - Replace references to Prompt components with WorkOrder components
+       - Fix prop types and data passing between components
+       - Resolve all TypeScript errors related to component integration
+
+    ### 3. App Component Updates
+    1. Fix `frontend/src/App.tsx`:
+       - Update imports to reference new WorkOrder components
+       - Fix property access on API hook returns (jobs, submitJob)
+       - Properly type component props
+       - Remove unused imports and variables
+
+    ## Detailed Implementation Plan
+
+    ### Phase 1: Fix API Configuration and Hooks
+    
+    1. Fix `frontend/src/config/api.ts`:
+    ```typescript
+    import axios from 'axios';
+
+    export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+
+    export const API_ENDPOINTS = {
+      // WorkOrder endpoints
+      WORKORDERS: `${API_BASE_URL}/workorders`,
+      WORKORDER: (id: string) => `${API_BASE_URL}/workorders/${id}`,
+      WORKORDER_HISTORY: (id: string) => `${API_BASE_URL}/workorders/${id}/history`,
+      WORKORDER_DIFF: (id: string) => `${API_BASE_URL}/workorders/${id}/diff`,
+      WORKORDER_RENDER: (id: string) => `${API_BASE_URL}/workorders/${id}/render`,
+      WORKORDER_TEST: (id: string) => `${API_BASE_URL}/workorders/${id}/test`,
+      
+      // Job endpoints
+      JOBS: `${API_BASE_URL}/jobs`,
+      JOB: (id: string) => `${API_BASE_URL}/jobs/${id}`,
+      JOB_CANCEL: (id: string) => `${API_BASE_URL}/jobs/${id}/cancel`,
+    };
+
+    // Create axios instance for API requests
+    export const apiClient = axios.create({
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    ```
+
+    2. Update `useWorkOrderApi.ts` to handle WorkOrder specific types and operations
+    
+    3. Update `useJobApi.ts` to ensure it returns expected properties:
+    ```typescript
+    return {
+      jobs, // Add this property
+      loading,
+      error,
+      getJobs,
+      getJob,
+      submitJob, // Add this method
+      cancelJob,
+      pollJobStatus
+    };
+    ```
+
+    ### Phase 2: Create WorkOrder-specific UI Components
+    
+    1. Create `WorkOrderMetadataPanel.tsx` using WorkOrder types
+    2. Create `WorkOrderParameterPanel.tsx` for WorkOrder parameters
+    3. Create `WorkOrderTestRunner.tsx` for testing WorkOrders
+    4. Create `WorkOrderVersionControl.tsx` for WorkOrder versions
+
+    These components should follow the patterns of their Prompt counterparts but use WorkOrder types.
+
+    ### Phase 3: Update Type Definitions
+    
+    1. Update `workorder.ts` to fix Date vs string issues:
+    ```typescript
+    export interface WorkOrderMetadata {
+      author: string;
+      created_at: string; // Ensure this is string, not Date
+      updated_at: string; // Ensure this is string, not Date
+      description?: string;
+      tags?: string[];
+      target_model?: string;
+      version: string;
+      asset?: string;
+      intent?: string;
+      goal?: string;
+      priority?: string;
+      due_date?: string; // Ensure this is string, not Date
+      assignee?: string;
+    }
+    ```
+
+    ### Phase 4: Update WorkOrderEditor Component
+    
+    1. Replace all Prompt component references with WorkOrder components
+    2. Fix prop passing and type handling
+    3. Update date handling to use string formats consistently
+
+    ### Phase 5: Fix App Component
+    
+    1. Update App.tsx to use properly typed components
+    2. Fix API hook usage
+
+    ## Testing Strategy
+
+    1. **Component Testing**: Verify each new component renders correctly with WorkOrder data
+    2. **Integration Testing**: Test the WorkOrderEditor with connected components
+    3. **API Testing**: Verify hooks correctly fetch and update data
+    4. **End-to-End Testing**: Validate the complete workflow from listing to editing to submitting jobs
+
+    ## Success Criteria
+
+    1. All TypeScript errors resolved
+    2. Application builds successfully
+    3. WorkOrderEditor loads and can edit WorkOrder objects
+    4. Jobs can be submitted and tracked
+    5. All UI components display appropriate data
+
+# LLM configuration
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        input_paths:
+          - "frontend/src"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219" 
+      temperature: 0.7
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+
+# Backup configuration
+backup:
+  enabled: true
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
