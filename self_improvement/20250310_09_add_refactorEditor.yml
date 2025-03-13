@@ -1,0 +1,345 @@
+
+# C4H Editor UI TypeScript Error Resolution Work Order (Phase 2 Enhanced)
+
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor"
+  workspace_root: "workspaces"
+
+# Intent description (the actual work order)
+intent:
+  description: |
+    # C4H Editor - TypeScript Error Resolution Work Order (Phase 2 Enhanced)
+
+    ## Goal
+    Resolve all TypeScript errors in the C4H Editor frontend codebase to complete the migration from "Prompt" to "WorkOrder" terminology and ensure application builds and runs without TypeScript errors.
+
+    ## Context
+    Multiple TypeScript errors remain after initial implementation, primarily related to component exports, imports, interface definitions, and property access. This work order provides a structured approach to resolving all remaining issues.
+
+    ## Required Changes (Prioritized)
+
+    ### Phase 1: Fix Core Type Definitions
+    
+    1. Complete the WorkOrder interface in `workorder.ts`:
+       ```typescript
+       export enum WorkOrderStatus {
+         DRAFT = 'draft',
+         SUBMITTED = 'submitted',
+         IN_PROGRESS = 'in_progress',
+         COMPLETED = 'completed',
+         FAILED = 'failed'
+       }
+
+       export interface WorkOrder {
+         id: string;
+         template: WorkOrderTemplate;
+         metadata: WorkOrderMetadata;
+         parent_id?: string;
+         lineage?: string[];
+         status?: WorkOrderStatus;
+       }
+
+       export interface WorkOrderTemplate {
+         text: string;
+         parameters: WorkOrderParameter[];
+         config?: WorkOrderConfig;
+       }
+
+       export interface WorkOrderMetadata {
+         author: string;
+         created_at: string;
+         updated_at: string;
+         description?: string;
+         tags?: string[];
+         target_model?: string;
+         version: string;
+         asset?: string;
+         intent?: string;
+         goal?: string;
+         priority?: string;
+         due_date?: string;
+         assignee?: string;
+       }
+       ```
+
+    ### Phase 2: Fix Export/Import Issues
+    
+    1. Fix duplicate Job import in JobsList.tsx:
+       ```typescript
+       // Remove duplicate import
+       import { Job } from '../../types/job';
+       ```
+
+    2. Standardize component exports:
+       
+       Add to WorkOrderEditor.tsx:
+       ```typescript
+       export default WorkOrderEditor;
+       ```
+       
+       Add to JobsList.tsx:
+       ```typescript
+       export default JobsList;
+       ```
+       
+       Add to JobDetails.tsx:
+       ```typescript
+       export default JobDetails;
+       ```
+
+    3. Update import statements in App.tsx:
+       ```typescript
+       import WorkOrderEditor from './components/WorkOrderEditor/WorkOrderEditor';
+       import JobsList from './components/JobsList/JobsList';
+       import JobDetails from './components/JobDetails/JobDetails';
+       import { useWorkOrderApi } from './hooks/useWorkOrderApi';
+       import { useJobApi } from './hooks/useJobApi';
+       ```
+
+    4. Update hook imports in components:
+       ```typescript
+       import { useWorkOrderApi } from '../../hooks/useWorkOrderApi';
+       ```
+
+    ### Phase 3: Fix Component Props Types
+
+    1. Add WorkOrderEditorProps interface:
+       ```typescript
+       export interface WorkOrderEditorProps {
+         workOrderId: string;
+         onSave: () => Promise<any>;
+         onUpdate: () => Promise<any>;
+         onDelete: () => void;
+         onTest: () => void;
+         onRender: () => Promise<string>;
+         onGetHistory: (id: string) => Promise<any>;
+         onGetVersion: (id: string, versionId: string) => Promise<any>;
+       }
+
+       export function WorkOrderEditor({
+         workOrderId,
+         onSave,
+         onUpdate,
+         onDelete,
+         onTest,
+         onRender,
+         onGetHistory,
+         onGetVersion
+       }: WorkOrderEditorProps) {
+         // implementation
+       }
+       ```
+
+    2. Add JobDetailsProps interface:
+       ```typescript
+       export interface JobDetailsProps {
+         jobId: string;
+         onClose: () => void;
+         onCancel: (jobId: string) => void;
+       }
+       
+       export function JobDetails({ jobId, onClose, onCancel }: JobDetailsProps) {
+         // implementation
+       }
+       ```
+
+    3. Add JobsListProps interface:
+       ```typescript
+       export interface JobsListProps {
+         jobs: Job[];
+         workOrders: WorkOrder[];
+         onSelect: (jobId: string) => void;
+         onSubmitJob: (workOrderId: string) => void;
+         onRefresh: () => void;
+       }
+       
+       export function JobsList({ jobs, workOrders, onSelect, onSubmitJob, onRefresh }: JobsListProps) {
+         // implementation
+       }
+       ```
+
+    ### Phase 4: Fix WorkOrderEditor State Management
+
+    1. Update WorkOrder state initialization:
+       ```typescript
+       setWorkOrder({
+         id: '',
+         template: {
+           text: '',
+           parameters: []
+         },
+         metadata: {
+           author: '',
+           created_at: new Date().toISOString(),
+           updated_at: new Date().toISOString(),
+           description: '',
+           tags: [],
+           version: '1.0.0'
+         }
+       });
+       ```
+
+    2. Fix property access throughout the component:
+       ```typescript
+       // Replace any instances of workOrder.content with:
+       workOrder.template.text
+       
+       // Replace any instances of workOrder.parameters with:
+       workOrder.template.parameters
+       
+       // Replace any instances of workOrder.metadata.title with:
+       workOrder.metadata.description
+       ```
+
+    3. Fix state updates for parameters:
+       ```typescript
+       setWorkOrder(prevState => {
+         if (!prevState) return null;
+         return {
+           ...prevState,
+           template: {
+             ...prevState.template,
+             parameters: updatedParameters
+           }
+         };
+       });
+       ```
+
+    ### Phase 5: Fix Job API and Polling
+
+    1. Add getJobLogs function to useJobApi:
+       ```typescript
+       const getJobLogs = async (jobId: string): Promise<any> => {
+         setLoading(true);
+         try {
+           const response = await api.get(`/api/v1/jobs/${jobId}/logs`);
+           setLoading(false);
+           return response.data;
+         } catch (error) {
+           setError(error instanceof Error ? error.message : String(error));
+           setLoading(false);
+           return null;
+         }
+       };
+       
+       // Include in return object
+       return {
+         jobs,
+         job,
+         loading,
+         error,
+         getJobs,
+         getJob,
+         submitJob,
+         cancelJob,
+         pollJobStatus,
+         getJobLogs
+       };
+       ```
+
+    2. Fix job polling in JobDetails.tsx:
+       ```typescript
+       useEffect(() => {
+         let intervalId: number | null = null;
+         
+         if (job && (job.status === 'submitted' || job.status === 'running')) {
+           intervalId = window.setInterval(() => {
+             pollJobStatus(job.id)
+               .then(updatedJob => {
+                 // Update job status
+                 if (updatedJob) {
+                   setJob(updatedJob);
+                 }
+               })
+               .catch(error => {
+                 console.error('Error polling job status:', error);
+               });
+           }, 5000);
+         }
+         
+         return () => {
+           if (intervalId !== null) {
+             window.clearInterval(intervalId);
+           }
+         };
+       }, [job, pollJobStatus]);
+       ```
+
+    ### Phase 6: Fix Error Message Handling
+
+    1. Update error message display to handle both string and Error objects:
+       ```typescript
+       <div className="error-message">
+         {typeof error === 'string' ? error : error?.message || 'An error occurred'}
+       </div>
+       ```
+
+    2. Fix refresh function calls:
+       ```typescript
+       // Change from
+       onClick={() => onRefresh(true)}
+       
+       // To
+       onClick={() => onRefresh()}
+       ```
+    
+    ## Files to Modify
+    - frontend/src/types/workorder.ts
+    - frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx
+    - frontend/src/components/JobDetails/JobDetails.tsx
+    - frontend/src/components/JobsList/JobsList.tsx
+    - frontend/src/hooks/useWorkOrderApi.ts
+    - frontend/src/hooks/useJobApi.ts
+    - frontend/src/App.tsx
+
+    ## Success Criteria
+    1. TypeScript builds without errors
+    2. Application launches successfully in the browser
+    3. Components render correctly with proper props
+    4. Job status polling works correctly
+    5. Error messages display properly
+
+# LLM configuration
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        input_paths:
+          - "frontend/src"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219" 
+      temperature: 0.7
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+
+# Backup configuration
+backup:
+  enabled: false
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

@@ -1,0 +1,268 @@
+# Work Order Configuration for TypeScript Error Resolution Phase 3
+
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor"
+  workspace_root: "workspaces"
+
+# Intent description (the actual work order)
+intent:
+  description: |
+    # C4H Editor - TypeScript Error Resolution (Phase 3)
+
+    ## Goal
+    Resolve all remaining TypeScript errors in the C4H Editor frontend codebase to complete the migration from "Prompt" to "WorkOrder" terminology and fix property naming convention mismatches between API responses and TypeScript interfaces.
+
+    ## Context
+    Previous fixes have started the migration but left several issues:
+    1. Property naming mismatches between API (snake_case) and TypeScript interfaces (camelCase)
+    2. Missing component prop interfaces
+    3. Incorrect enum usage
+    4. Missing API configuration
+
+    ## Required Changes (Prioritized)
+
+    ### 1. Create API Configuration File
+    Create `frontend/src/config/api.ts` to export the axios instance:
+    ```typescript
+    import axios from 'axios';
+
+    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
+    export const api = axios.create({
+      baseURL,
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+
+    // Add response interceptor for error handling
+    api.interceptors.response.use(
+      response => response,
+      error => {
+        console.error('API Error:', error);
+        return Promise.reject(error);
+      }
+    );
+    ```
+
+    ### 2. Fix Job Type Interface
+    Update `frontend/src/types/job.ts` to use camelCase property names:
+    ```typescript
+    export enum JobStatus {
+      CREATED = 'created',
+      SUBMITTED = 'submitted',
+      RUNNING = 'running',
+      COMPLETED = 'completed',
+      FAILED = 'failed',
+      CANCELLED = 'cancelled'
+    }
+
+    export interface JobResult {
+      output?: string;
+      artifacts?: any[];
+      metrics?: Record<string, any>;
+      error?: string;
+    }
+
+    export interface Job {
+      id: string;
+      workOrderId: string; // Was work_order_id
+      workOrderVersion: string; // Was work_order_version 
+      status: JobStatus; // Now using enum instead of string
+      serviceJobId?: string; // Was service_job_id
+      createdAt: string; // Was created_at
+      updatedAt: string; // Was updated_at
+      submittedAt?: string; // Was submitted_at
+      completedAt?: string; // Was completed_at
+      userId?: string; // Was user_id
+      configuration: Record<string, any>;
+      results?: JobResult; // Was result
+    }
+    ```
+
+    ### 3. Add Navigation Props Interface
+    Add props interface to `frontend/src/components/common/Navigation.tsx`:
+    ```typescript
+    export interface NavigationProps {
+      activeView: 'workorders' | 'jobs';
+      onNavigate: (view: 'workorders' | 'jobs') => void;
+      onRefresh: () => void;
+    }
+
+    const Navigation: React.FC<NavigationProps> = ({ activeView, onNavigate, onRefresh }) => {
+      // Keep existing component implementation
+    };
+    ```
+
+    ### 4. Fix JobDetails Component
+    Update `frontend/src/components/JobDetails/JobDetails.tsx`:
+    - Import JobStatus enum
+    - Replace string status comparisons with enum values
+    - Fix property name references from snake_case to camelCase:
+
+    ```typescript
+    // Add import for JobStatus
+    import { Job, JobStatus } from '../../types/job';
+
+    // Replace string status comparisons:
+    if (job && (job.status === JobStatus.SUBMITTED || job.status === JobStatus.RUNNING)) {
+      // instead of: if (job && (job.status === 'submitted' || job.status === 'running')) {
+
+    // Fix property references:
+    <p>Work Order ID: {job.workOrderId}</p>
+    // instead of: <p>Work Order ID: {job.work_order_id}</p>
+
+    // Fix result property:
+    {job.results && (
+      // instead of: {job.result && (
+    ```
+
+    ### 5. Fix JobsList Component
+    Update `frontend/src/components/JobsList/JobsList.tsx`:
+    - Fix property references from snake_case to camelCase:
+
+    ```typescript
+    {job.workOrderId} - {job.status}
+    // instead of: {job.work_order_id} - {job.status}
+    ```
+
+    ### 6. Add Response Mapping in useJobApi
+    Add mapper function to `frontend/src/hooks/useJobApi.ts`:
+    ```typescript
+    // Add after useState declarations
+    const mapResponseToJob = (data: any): Job => ({
+      id: data.id,
+      workOrderId: data.work_order_id,
+      workOrderVersion: data.work_order_version,
+      status: data.status as JobStatus,
+      serviceJobId: data.service_job_id,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      submittedAt: data.submitted_at,
+      completedAt: data.completed_at,
+      userId: data.user_id,
+      configuration: data.configuration || {},
+      results: data.result ? {
+        output: data.result.output,
+        artifacts: data.result.artifacts,
+        metrics: data.result.metrics,
+        error: data.result.error
+      } : undefined
+    });
+
+    // Then update all function implementations to use this mapper:
+    // getJobs:
+    const data = (response.data.items || []).map(mapResponseToJob);
+
+    // getJob:
+    const data = mapResponseToJob(response.data);
+
+    // submitJob:
+    const responseData = mapResponseToJob(response.data);
+
+    // pollJobStatus:
+    const data = mapResponseToJob(response.data);
+    ```
+
+    ### 7. Ensure proper error handling in App.tsx
+    Add error display to `frontend/src/App.tsx`:
+    ```typescript
+    // Add after state initialization:
+    {/* Render errors if any */}
+    {(workOrderError || jobError) && (
+      <div className="error-container">
+        <h2>Error</h2>
+        <p>{typeof (workOrderError || jobError) === 'string' 
+          ? (workOrderError || jobError) 
+          : (workOrderError || jobError)?.message || 'An error occurred'}</p>
+        <button onClick={handleRefresh}>Retry</button>
+      </div>
+    )}
+    ```
+
+    ### 8. Add React imports as named imports
+    Remove React default imports and use named imports where needed:
+    ```typescript
+    // Change this:
+    import React, { useState, useEffect } from 'react';
+
+    // To this:
+    import { useState, useEffect, FC } from 'react';
+    ```
+
+    ## Integration Approach
+    1. Use incremental changes to fix one file at a time
+    2. Test TypeScript compilation after each change
+    3. Keep existing code intact - only make the minimum changes needed to fix errors
+    4. Focus on mapping between API response formats (snake_case) and TypeScript interfaces (camelCase)
+    5. Add proper type interfaces without losing functionality
+
+    ## Files to Modify
+    - frontend/src/config/api.ts (new file)
+    - frontend/src/types/job.ts
+    - frontend/src/components/common/Navigation.tsx
+    - frontend/src/components/JobDetails/JobDetails.tsx
+    - frontend/src/components/JobsList/JobsList.tsx
+    - frontend/src/hooks/useJobApi.ts
+    - frontend/src/hooks/useWorkOrderApi.ts
+    - frontend/src/App.tsx
+    - frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx
+
+    ## Success Criteria
+    1. TypeScript builds without errors
+    2. Application launches successfully in the browser
+    3. Components render correctly with proper props
+    4. API data is correctly mapped between snake_case and camelCase
+    5. Enum types are used correctly for status comparisons
+    6. Error messages display properly
+
+# LLM configuration
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        input_paths:
+          - "frontend/src"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219" 
+      temperature: 0.5
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+      subdirs:
+        - "events"
+        - "config"
+      error_handling:
+        ignore_storage_errors: true
+        log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: false
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"

@@ -1,0 +1,250 @@
+# C4H Editor UI TypeScript Error Fixes Work Order
+
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor"
+  workspace_root: "workspaces"
+
+# Intent description (the actual work order)
+intent:
+  description: |
+    # C4H Editor - TypeScript Error Resolution Work Order
+
+    ## Goal
+    Resolve all TypeScript errors in the C4H Editor frontend codebase related to the WorkOrder component implementation, ensuring proper exports, imports, type definitions, and component props.
+
+    ## Context
+    A partial refactoring from "Prompt" to "WorkOrder" terminology has left several TypeScript errors and inconsistencies in the codebase. We need to systematically fix all these issues to complete the migration.
+
+    ## Required Changes
+
+    ### 1. Fix Type Definitions in workorder.ts
+    1. Add missing WorkOrderStatus enum:
+       ```typescript
+       export enum WorkOrderStatus {
+         DRAFT = 'draft',
+         SUBMITTED = 'submitted',
+         IN_PROGRESS = 'in_progress',
+         COMPLETED = 'completed',
+         FAILED = 'failed'
+       }
+       ```
+
+    2. Update WorkOrder interface to include expected properties:
+       ```typescript
+       export interface WorkOrder {
+         id: string;
+         template: WorkOrderTemplate;
+         metadata: WorkOrderMetadata;
+         parent_id?: string;
+         lineage?: string[];
+         status?: WorkOrderStatus;
+       }
+       ```
+
+    3. Ensure WorkOrderMetadata has all required fields:
+       ```typescript
+       export interface WorkOrderMetadata {
+         author: string;
+         created_at: string; // Use string instead of Date
+         updated_at: string; // Use string instead of Date
+         description?: string;
+         tags?: string[];
+         target_model?: string;
+         version: string; // Required field that was missing
+         // Additional fields
+         asset?: string;
+         intent?: string;
+         goal?: string;
+         priority?: string;
+         due_date?: string; // Use string instead of Date
+         assignee?: string;
+       }
+       ```
+
+    ### 2. Fix Component Export in WorkOrderEditor.tsx
+    Add default export at the end of the file:
+    ```typescript
+    export default WorkOrderEditor;
+    ```
+
+    ### 3. Update API Hooks Exports and Imports
+
+    1. Update useWorkOrderApi.ts to use named export:
+       ```typescript
+       // Change from
+       export default function useWorkOrderApi() {
+         // implementation
+       }
+       
+       // To
+       export function useWorkOrderApi() {
+         // implementation
+       }
+       ```
+
+    2. Update useJobApi.ts to use named export:
+       ```typescript
+       // Change from
+       export default function useJobApi() {
+         // implementation
+       }
+       
+       // To
+       export function useJobApi() {
+         // implementation
+       }
+       ```
+
+    3. Ensure useJobApi returns the required properties:
+       ```typescript
+       return {
+         jobs, // Required for JobsList component
+         loading,
+         error,
+         getJobs,
+         getJob,
+         submitJob, // Required for job submission
+         cancelJob,
+         pollJobStatus
+       };
+       ```
+
+    ### 4. Fix Component Prop Types
+
+    1. Add prop interface for JobDetails component:
+       ```typescript
+       export interface JobDetailsProps {
+         jobId: string;
+         onClose: () => void;
+         onCancel: (jobId: string) => void;
+       }
+       
+       export function JobDetails({ jobId, onClose, onCancel }: JobDetailsProps) {
+         // implementation
+       }
+       ```
+
+    2. Add prop interface for JobsList component:
+       ```typescript
+       export interface JobsListProps {
+         jobs: Job[];
+         workOrders: WorkOrder[];
+         onSelect: (jobId: string) => void;
+         onSubmitJob: (workOrderId: string) => void;
+         onRefresh: () => void;
+       }
+       
+       export function JobsList({ jobs, workOrders, onSelect, onSubmitJob, onRefresh }: JobsListProps) {
+         // implementation
+       }
+       ```
+
+    ### 5. Fix App.tsx Imports and Prop Passing
+
+    1. Update App.tsx imports:
+       ```typescript
+       import WorkOrderEditor from './components/WorkOrderEditor/WorkOrderEditor';
+       import { useWorkOrderApi } from './hooks/useWorkOrderApi';
+       import { useJobApi } from './hooks/useJobApi';
+       ```
+
+    2. Fix prop passing to components:
+       ```typescript
+       <JobsList 
+         jobs={jobs}
+         workOrders={workOrders}
+         onSelect={handleJobSelect}
+         onSubmitJob={handleSubmitJob}
+         onRefresh={handleRefresh}
+       />
+       
+       <JobDetails 
+         jobId={selectedJob}
+         onClose={() => setSelectedJob(null)}
+         onCancel={handleCancelJob}
+       />
+       ```
+
+    ## Implementation Strategy
+
+    ### Phase 1: Fix Type Definitions
+    1. Update `workorder.ts` with the WorkOrderStatus enum
+    2. Correct WorkOrder interface to include template property
+    3. Update WorkOrderMetadata to add required version field
+    4. Fix all date-related fields to use string type
+
+    ### Phase 2: Fix Component and Hook Exports
+    1. Add default export to WorkOrderEditor.tsx
+    2. Update useWorkOrderApi.ts to use named export
+    3. Update useJobApi.ts to use named export
+
+    ### Phase 3: Fix Component Props
+    1. Add JobDetailsProps interface and update component to use it
+    2. Add JobsListProps interface and update component to use it
+    3. Fix any other component prop type mismatches
+
+    ### Phase 4: Update App.tsx
+    1. Fix import statements
+    2. Update hook usage and destructuring
+    3. Correct prop passing to components
+
+    ## Files to Modify
+    - frontend/src/types/workorder.ts
+    - frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx
+    - frontend/src/hooks/useWorkOrderApi.ts
+    - frontend/src/hooks/useJobApi.ts
+    - frontend/src/components/JobDetails/JobDetails.tsx
+    - frontend/src/components/JobsList/JobsList.tsx
+    - frontend/src/App.tsx
+
+    ## Success Criteria
+    1. All TypeScript errors resolved
+    2. Application builds without warnings
+    3. Components render correctly with proper props
+    4. API hooks return expected properties
+    5. App.tsx correctly uses the imported components and hooks
+
+# LLM configuration
+llm_config:
+  agents:
+    discovery:
+      tartxt_config:
+        input_paths:
+          - "frontend/src"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219" 
+      temperature: 0.7
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+
+# Backup configuration
+backup:
+  enabled: false
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
