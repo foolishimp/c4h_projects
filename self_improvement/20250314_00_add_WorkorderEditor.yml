@@ -1,302 +1,130 @@
-Based on your request, I'll create a work order focusing on implementing steps 1 and 2 of the MVP requirements: enhancing the WorkOrder Editor and improving WorkOrder Management. I'll follow the C4H work order template and provide comprehensive context to guide implementation decisions.
-
-# C4H Editor - WorkOrder Editor & Management Enhancements
+# C4H Editor - WorkOrder Editor & Management Enhancements (Phase 1)
 
 # Project settings
 project:
   path: "/Users/jim/src/apps/c4h_editor"
   workspace_root: "workspaces"
 
-# Intent description (the actual work order)
+# Intent description
 intent:
   description: |
-      # C4H Editor - WorkOrder Editor & Management Enhancements (Phase 1)
+        # C4H Editor - WorkOrder Editor & Management Enhancements (Phase 1)
 
-      ## Goal
-      Enhance the C4H Editor with a comprehensive WorkOrder Editor and Management system that aligns with the configuration hierarchy principles and provides users with robust tools for creating, editing, and managing work orders.
+        ## Goal
+        Enhance the C4H Editor with a comprehensive WorkOrder Editor and Management system that aligns with the configuration hierarchy principles and provides users with robust tools for creating, editing, and managing work orders.
 
-      ## Context
-      The current C4H Editor implementation has basic WorkOrder management but lacks the specialized editors and UI components needed to fully support the hierarchical configuration design principles. This work order focuses on implementing the tabbed editor interface and improving WorkOrder management capabilities.
+        ## Context
+        The current C4H Editor implementation has basic WorkOrder management but lacks the specialized editors and UI components needed to fully support the hierarchical configuration design principles. This work order focuses on implementing the tabbed editor interface and improving WorkOrder management capabilities.
 
-      ## Required Changes (Prioritized)
+        ## Required Changes (Prioritized)
 
-      ### 1. WorkOrder Editor Enhancements
-      
-      1.1. Create a tabbed interface in the WorkOrder Editor with tabs for each major configuration section:
-      - Intent Configuration
-      - Project Configuration
-      - LLM Configuration
-      - Orchestration Configuration
-      - Runtime Configuration
-      
-      1.2. Implement specialized editors for different configuration types:
-      - Text editor for free-form text sections
-      - Structured form for metadata
-      - Parameter editor for workorder parameters
-      - Configuration editor for hierarchical settings
-      
-      1.3. Add validation compatible with hierarchical config design principles:
-      - Validate required fields without excessive validation
-      - Maintain hierarchy structure during edits
-      - Support merging behavior where overrides update leaf values
-      
-      1.4. Add YAML preview/edit mode:
-      - Provide a YAML view of the complete workorder
-      - Allow direct YAML editing with syntax highlighting
-      - Implement two-way sync between UI editors and YAML view
-
-      ### 2. WorkOrder Management Improvements
-      
-      2.1. Complete the archive functionality:
-      - Add archive/unarchive buttons to WorkOrder list
-      - Implement archive status field in the WorkOrder model
-      - Create filtered views for active vs archived workorders
-      
-      2.2. Enhance clone functionality:
-      - Implement "Clone" action in the WorkOrder list
-      - Automatically generate unique IDs for cloned workorders
-      - Copy all configuration with optional prompt for new description
-      
-      2.3. Add filtering, sorting, and pagination to WorkOrder listing:
-      - Filter by status, author, tags, and other metadata
-      - Sort by creation date, update date, or alphabetically
-      - Implement pagination for large numbers of workorders
-      
-      2.4. Implement version comparison and rollback UI:
-      - Show version history with timestamps and authors
-      - Provide diff view between versions
-      - Allow rollback to previous versions
-
-      ## Implementation Details
-
-      ### WorkOrder Editor Component Structure
-      
-      ```typescript
-      // WorkOrderEditor.tsx
-      export interface WorkOrderEditorProps {
-        workOrderId?: string;
-        onSave?: (workOrder: WorkOrder) => void;
-        onClose?: () => void;
-      }
-
-      export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
-        workOrderId,
-        onSave,
-        onClose
-      }) => {
-        const [activeTab, setActiveTab] = useState<number>(0);
-        const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
+        ### 1. WorkOrder Editor Enhancements
         
-        // Tab definitions
-        const tabs = [
-          { label: "Intent", component: <IntentConfigTab workOrder={workOrder} onChange={handleIntentChange} /> },
-          { label: "Project", component: <ProjectConfigTab workOrder={workOrder} onChange={handleProjectChange} /> },
-          { label: "LLM", component: <LLMConfigTab workOrder={workOrder} onChange={handleLLMChange} /> },
-          { label: "Orchestration", component: <OrchestrationConfigTab workOrder={workOrder} onChange={handleOrchestrationChange} /> },
-          { label: "Runtime", component: <RuntimeConfigTab workOrder={workOrder} onChange={handleRuntimeChange} /> },
-          { label: "YAML", component: <YAMLEditorTab workOrder={workOrder} onChange={handleYAMLChange} /> }
-        ];
-
-        // Implementation logic...
-      }
-      ```
-
-      ### Tab Component Example
-      
-      ```typescript
-      // IntentConfigTab.tsx
-      export interface IntentConfigTabProps {
-        workOrder: WorkOrder | null;
-        onChange: (intent: any) => void;
-      }
-
-      export const IntentConfigTab: React.FC<IntentConfigTabProps> = ({
-        workOrder,
-        onChange
-      }) => {
-        // Get intent from workOrder or default
-        const intent = workOrder?.intent || { description: "" };
+        1.1. Create a tabbed interface in the WorkOrder Editor with tabs for each major configuration section:
+        - Intent Configuration
+        - Project Configuration
+        - LLM Configuration
+        - Orchestration Configuration
+        - Runtime Configuration
         
-        // Editor implementation...
-      }
-      ```
-
-      ### YAML Editor Component
-      
-      ```typescript
-      // YAMLEditorTab.tsx
-      import { Editor } from '@monaco-editor/react';
-      import * as YAML from 'js-yaml';
-
-      export interface YAMLEditorTabProps {
-        workOrder: WorkOrder | null;
-        onChange: (workOrder: WorkOrder) => void;
-      }
-
-      export const YAMLEditorTab: React.FC<YAMLEditorTabProps> = ({
-        workOrder,
-        onChange
-      }) => {
-        // Convert workOrder to YAML
-        const yamlString = workOrder ? YAML.dump(workOrder) : '';
+        1.2. Implement specialized editors for different configuration types:
+        - Text editor for free-form text sections
+        - Structured form for metadata
+        - Parameter editor for workorder parameters
+        - Configuration editor for hierarchical settings
         
-        // Handle YAML changes
-        const handleYAMLChange = (value: string | undefined) => {
-          if (!value) return;
-          
-          try {
-            const updatedWorkOrder = YAML.load(value) as WorkOrder;
-            onChange(updatedWorkOrder);
-          } catch (error) {
-            // Handle YAML parsing errors
-          }
-        };
+        1.3. Add validation compatible with hierarchical config design principles:
+        - Validate required fields without excessive validation
+        - Maintain hierarchy structure during edits
+        - Support merging behavior where overrides update leaf values
         
-        return (
-          <Editor
-            height="600px"
-            defaultLanguage="yaml"
-            value={yamlString}
-            onChange={handleYAMLChange}
-            options={{
-              minimap: { enabled: false },
-              lineNumbers: 'on',
-              scrollBeyondLastLine: false,
-              wordWrap: 'on'
-            }}
-          />
-        );
-      }
-      ```
+        1.4. Add YAML preview/edit mode:
+        - Provide a YAML view of the complete workorder
+        - Allow direct YAML editing with syntax highlighting
+        - Implement two-way sync between UI editors and YAML view
 
-      ### WorkOrder List Enhancements
-      
-      ```typescript
-      // WorkOrderList.tsx
-      export interface WorkOrderListProps {
-        workOrders: WorkOrder[];
-        onSelect: (id: string) => void;
-        onClone: (id: string) => void;
-        onArchive: (id: string, archive: boolean) => void;
-        onRefresh: () => void;
-      }
-
-      export const WorkOrderList: React.FC<WorkOrderListProps> = ({
-        workOrders,
-        onSelect,
-        onClone,
-        onArchive,
-        onRefresh
-      }) => {
-        const [page, setPage] = useState(0);
-        const [rowsPerPage, setRowsPerPage] = useState(10);
-        const [sortBy, setSortBy] = useState<string>('updated_at');
-        const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-        const [filters, setFilters] = useState({
-          status: '',
-          author: '',
-          tag: ''
-        });
+        ### 2. WorkOrder Management Improvements
         
-        // Filter and sort logic...
+        2.1. Complete the archive functionality:
+        - Add archive/unarchive buttons to WorkOrder list
+        - Implement archive status field in the WorkOrder model
+        - Create filtered views for active vs archived workorders
         
-        // Pagination handlers...
+        2.2. Enhance clone functionality:
+        - Implement "Clone" action in the WorkOrder list
+        - Automatically generate unique IDs for cloned workorders
+        - Copy all configuration with optional prompt for new description
         
-        // Render data grid...
-      }
-      ```
+        2.3. Add filtering, sorting, and pagination to WorkOrder listing:
+        - Filter by status, author, tags, and other metadata
+        - Sort by creation date, update date, or alphabetically
+        - Implement pagination for large numbers of workorders
+        
+        2.4. Implement version comparison and rollback UI:
+        - Show version history with timestamps and authors
+        - Provide diff view between versions
+        - Allow rollback to previous versions
 
-      ### Backend API Enhancements
-      
-      ```python
-      # routes/workorders.py
-      @router.put("/{workorder_id}/archive")
-      async def archive_workorder(
-          workorder_id: str = Path(...),
-          archive: bool = Query(..., description="Whether to archive or unarchive"),
-          repo: WorkOrderRepository = Depends(get_workorder_repository)
-      ):
-          """Archive or unarchive a workorder."""
-          try:
-              result = repo.update_workorder_status(
-                  workorder_id=workorder_id,
-                  archived=archive
-              )
-              return {"message": f"WorkOrder {workorder_id} {'archived' if archive else 'unarchived'} successfully"}
-          except ValueError as e:
-              raise HTTPException(status_code=404, detail=str(e))
-          except Exception as e:
-              logger.error(f"Error archiving workorder: {e}")
-              raise HTTPException(status_code=500, detail=f"Failed to archive workorder: {str(e)}")
-      
-      @router.post("/{workorder_id}/clone")
-      async def clone_workorder(
-          workorder_id: str = Path(...),
-          new_id: Optional[str] = Query(None),
-          repo: WorkOrderRepository = Depends(get_workorder_repository)
-      ):
-          """Clone a workorder."""
-          try:
-              # Generate a unique ID if not provided
-              if not new_id:
-                  new_id = f"{workorder_id}-copy-{uuid.uuid4().hex[:8]}"
-                  
-              cloned_workorder = repo.clone_workorder(
-                  workorder_id=workorder_id,
-                  new_id=new_id
-              )
-              return cloned_workorder
-          except ValueError as e:
-              raise HTTPException(status_code=404, detail=str(e))
-          except Exception as e:
-              logger.error(f"Error cloning workorder: {e}")
-              raise HTTPException(status_code=500, detail=f"Failed to clone workorder: {str(e)}")
-      ```
+        ## Implementation Details
 
-      ## Model Enhancements
-      
-      ```python
-      # models/workorder.py
-      class WorkOrder(BaseModel):
-          """Complete workorder definition including template, metadata, and configuration."""
-          id: str = Field(..., description="Unique identifier for the workorder")
-          template: WorkOrderTemplate
-          metadata: WorkOrderMetadata
-          parent_id: Optional[str] = Field(None, description="ID of the parent workorder if this is derived")
-          lineage: List[str] = Field(default_factory=list, description="Lineage chain of workorder IDs")
-          archived: bool = Field(False, description="Whether the workorder is archived")
-          
-          # ... existing methods ...
-      ```
+        1. Tabbed Editor Components:
+          - WorkOrderEditor.tsx: The main editor with tabs for different sections
+          - IntentConfigTab.tsx: For editing description, goals, etc.
+          - ProjectConfigTab.tsx: For project paths and workspace settings 
+          - LLMConfigTab.tsx: For LLM providers, models, and parameters
+          - OrchestrationConfigTab.tsx: For teams, tasks, and routing
+          - RuntimeConfigTab.tsx: For workflow and lineage settings
+          - YAMLEditorTab.tsx: For raw YAML editing
 
-      ## Files to Modify/Create
-      - `frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx`
-      - `frontend/src/components/WorkOrderEditor/IntentConfigTab.tsx` (new)
-      - `frontend/src/components/WorkOrderEditor/ProjectConfigTab.tsx` (new)
-      - `frontend/src/components/WorkOrderEditor/LLMConfigTab.tsx` (new)
-      - `frontend/src/components/WorkOrderEditor/OrchestrationConfigTab.tsx` (new)
-      - `frontend/src/components/WorkOrderEditor/RuntimeConfigTab.tsx` (new)
-      - `frontend/src/components/WorkOrderEditor/YAMLEditorTab.tsx` (new)
-      - `frontend/src/components/WorkOrderList/WorkOrderList.tsx` (modify/enhance)
-      - `frontend/src/hooks/useWorkOrderApi.ts` (update with new methods)
-      - `backend/models/workorder.py` (update model)
-      - `backend/api/routes/workorders.py` (add new endpoints)
-      - `backend/services/workorder_repository.py` (add new methods)
+        2. Backend Enhancements:
+          - Add archive field to WorkOrder model
+          - Create API endpoints for archive/unarchive and clone
+          - Update list endpoint to support filtering, sorting, pagination
 
-      ## Success Criteria
-      1. User can view and edit WorkOrders through a tabbed interface
-      2. Each tab correctly handles its specific configuration section
-      3. YAML view/edit mode works for advanced users
-      4. WorkOrder list supports filtering, sorting, and pagination
-      5. Users can archive/unarchive WorkOrders
-      6. Users can clone WorkOrders with unique IDs
-      7. Version history is displayed with diff view
-      8. Changes maintain hierarchical configuration principles
+        3. UI Management Features:
+          - Update WorkOrder list with filtering and sorting controls
+          - Add archive and clone actions to list items
+          - Enhance version history display with diff view
+
+        ## Files to Modify
+
+        1. Frontend:
+          - frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx
+          - frontend/src/components/WorkOrderEditor/WorkOrderVersionControl.tsx
+          - frontend/src/hooks/useWorkOrderApi.ts
+
+        2. Backend:
+          - backend/models/workorder.py
+          - backend/api/routes/workorders.py
+          - backend/services/workorder_repository.py
+
+        ## Files to Create
+
+        1. Frontend:
+          - frontend/src/components/WorkOrderEditor/IntentConfigTab.tsx
+          - frontend/src/components/WorkOrderEditor/ProjectConfigTab.tsx
+          - frontend/src/components/WorkOrderEditor/LLMConfigTab.tsx
+          - frontend/src/components/WorkOrderEditor/OrchestrationConfigTab.tsx
+          - frontend/src/components/WorkOrderEditor/RuntimeConfigTab.tsx
+          - frontend/src/components/WorkOrderEditor/YAMLEditorTab.tsx
+          - frontend/src/components/WorkOrderList/WorkOrderList.tsx
+
+        ## Dependencies
+
+        - Monaco Editor: For code and YAML editing
+        - js-yaml: For YAML parsing and serialization
+        - MUI components: For tabs, forms, and data grid
+        - Git: For version control and diffing
 
 # LLM configuration
 llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  
   agents:
     discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
       tartxt_config:
         input_paths:
           - "frontend/src"
@@ -326,6 +154,9 @@ runtime:
       enabled: true
       root_dir: "workspaces/workflows"
       format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
 
 # Backup configuration
 backup:
@@ -337,3 +168,6 @@ logging:
   level: "INFO"
   format: "structured"
   agent_level: "DEBUG"
+  truncate:
+    prefix_length: 30
+    suffix_length: 30
