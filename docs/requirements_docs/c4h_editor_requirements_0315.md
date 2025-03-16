@@ -249,9 +249,13 @@ The C4H Editor will be implemented in phases:
 
 1. **WorkOrder Editor Enhancements**:
    - Tabbed interface for configuration sections
-   - Specialized editors for different configuration types
-   - YAML preview/edit mode
-   - Validation compatible with hierarchical config principles
+   - Each editor is for a YAML configuration
+  - For MVP only two tabs
+    1.1 System Configuratin - YAML 
+    1.2 Intent Configuration -YMAL
+  
+  - Workorder is the full system + intent config
+  - Refer to the SystemConfig Design Guide, WorkOrder Design Guide, Config Design Principles
 
 2. **WorkOrder Management Improvements**:
    - Archive/unarchive functionality

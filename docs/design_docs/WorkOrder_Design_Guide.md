@@ -1,7 +1,5 @@
 # C4H Agent System: Prompt Design Guidelines
 
-After reviewing the codebase and configuration examples, I'll create a comprehensive guide for designing prompts/work orders for the C4H Agent System. This document will help users structure their prompts effectively.
-
 ## Purpose of This Guide
 
 This document provides guidance on how to create effective prompts (work orders) for the C4H Agent System. It covers the structure, key components, and best practices for designing prompts that align with the system's design principles.
