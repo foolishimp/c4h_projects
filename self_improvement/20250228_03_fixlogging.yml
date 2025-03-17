@@ -39,44 +39,9 @@ intent:
       - Config Location: Clear hierarchical paths
       - Config Access: Agents access only their own config section
     
-    All changes should maintain backward compatibility with existing functionality while adding the new team-based capabilities. The system should be designed to allow gradual migration from the current static workflow to the new team-based approach.
+    All changes should maintain backward compatibility with existing 
+    functionality while adding the new team-based capabilities. The system should be designed to allow gradual migration from the current static workflow to the new team-based approach.
 
-llm_config:
-  agents:
-    discovery:
-      tartxt_config:
-        script_path: "/Users/jim/src/apps/c4h_ai_dev/c4h_agents/skills/tartxt.py"
-        input_paths:
-          - "c4h_services"
-          - "c4h_agents"
-          - "docs/Agent_Design_Principles.md"
-        exclusions:
-          - "**/__pycache__/**"
-          - "**/.git/**"
-          - "**/*.pyc"
-        output_type: "stdout"
-        
-    solution_designer:
-      provider: "anthropic"
-      model: "claude-3-7-sonnet-20250219"
-      temperature: 1
-      extended_thinking:
-        enabled: true
-        budget_tokens: 32000 # 32k tokens for extended thinking
-        
-    coder:
-      provider: "anthropic"
-      model: "claude-3-7-sonnet-20250219"
-      temperature: 0
-      backup_enabled: true
-      
-    semantic_iterator:
-      provider: "anthropic"
-      model: "claude-3-7-sonnet-20250219"
-      temperature: 0
-      extractor_config:
-        mode: "fast"
-        allow_fallback: true
         
 runtime:
   workflow:

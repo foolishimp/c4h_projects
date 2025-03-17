@@ -1,0 +1,131 @@
+# C4H Editor - WorkOrder Editor & Management Enhancements (Phase 1)
+
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor"
+  workspace_root: "workspaces"
+
+# Intent description
+intent:
+  description: |
+        # Root Cause Analysis: WorkOrderEditor State Management Issues
+
+        GOAL, fix the root causes for the configuration state loss:
+
+        ## Core Issues
+
+        1. **Inconsistent State Ownership Model**:
+          - The editor components (YAML/Configuration) maintain local state but don't reliably sync with parent
+          - The parent `WorkOrderEditor` re-generates YAML from the workOrder object, overwriting user changes
+          - Conflicts between local component state and global workOrder state aren't resolved properly
+
+        2. **Improper YAML-to-Object Mapping**:
+          - When pasting complete configurations, the code attempts to detect and handle it but doesn't map fields correctly
+          - The mapping between YAML structure and the workOrder object structure is fragile and inconsistent
+
+        3. **Violation of TypeScript Design Principles**:
+          - "Single Responsibility Principle" is violated — components have unclear boundaries of responsibility
+          - "Props-Only Communication" is compromised by side-effectful state operations
+          - "Interface-Driven Development" is missing clear interfaces for state management
+
+        4. **Asynchronous Operation Flaws**:
+          - The save flow doesn't properly coordinate between editor state, application state, and server state
+          - Changes aren't reliably applied before saving to backend
+
+        ## Instructions for Correct Fix
+
+        1. **Establish Clear State Ownership**:
+          - The `WorkOrderEditor` component should be the single source of truth for workOrder state
+          - Editor components should only report changes but never own workOrder state
+          - Use the "Controlled Component" pattern consistently
+
+        2. **Implement Proper Data Flow**:
+          - YAML content should flow downward via props to editor components
+          - Editor components should emit change events but never directly modify workOrder
+          - Parent component should apply changes to its state before saving
+
+        3. **Define Clear Interfaces**:
+          - Create explicit interfaces for all data structures and component props
+          - Define TypeScript enums for section types and state types
+          - Use discriminated unions for complex state representations
+
+        4. **Separate YAML Parsing from State Updates**:
+          - Create a pure mapping function between YAML and workOrder structure
+          - Handle special cases (like full configuration pastes) in this separate mapping function
+          - Test this mapping function independently to ensure correctness
+
+        5. **Use a More Robust State Management Approach**:
+          - Consider using a reducer pattern for complex state transitions
+          - Track "dirty" state explicitly rather than inferring from differences
+          - Ensure changes in one component cannot inadvertently affect others
+
+        6. **Fix Save Flow Coordination**:
+          - Ensure YAML changes are applied to workOrder before saving
+          - Add validation of the resulting workOrder before sending to backend
+          - Provide clear feedback for each stage of the save process
+
+        7. **Coordinate Multiple Editors**:
+          - Track pending changes per section independently
+          - When switching tabs, properly apply changes from the current section
+          - When saving, check for pending changes in all sections
+
+        The essential fix is to implement a clean, unidirectional data flow where the 
+        WorkOrderEditor maintains state and passes it down to child components, 
+        while receiving change events that it can choose to apply to its state or ignore.
+
+# LLM configuration
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      tartxt_config:
+        input_paths:
+          - "frontend/src"
+          - "backend_api.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/TypeScript_Design_Principles.md"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219" 
+      temperature: 0.7
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: true
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+  truncate:
+    prefix_length: 30
+    suffix_length: 30
