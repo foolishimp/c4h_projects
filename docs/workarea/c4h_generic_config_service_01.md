@@ -1,8 +1,8 @@
-# Updated C4H Editor Backend API Specification
+# C4H Editor Backend API Specification
 
 ## Overview
 
-This specification extends the existing C4H Editor Backend API to support a configuration-driven approach for managing multiple configuration types (WorkOrder, TeamConfig, RuntimeConfig, etc.) while maintaining the same core architecture. The API will dynamically handle different configuration repositories based on config type.
+This specification defines the backend API to support the C4H Editor, a modular configuration management system. The API provides a configuration-driven approach for managing multiple configuration types (WorkOrder, TeamConfig, RuntimeConfig, etc.) through a unified interface. The backend dynamically handles different configuration repositories based on config type.
 
 ## Base URL
 
@@ -12,7 +12,29 @@ http://localhost:8000
 
 ## Authentication
 
-Authentication remains unchanged. The backend continues to use API keys for third-party services stored in environment variables.
+The backend uses API keys for third-party services stored in environment variables.
+
+## Data Model
+
+### Configuration Types
+The system supports multiple configuration types:
+- **WorkOrder**: Defines what needs to be done and against which asset
+- **TeamConfig**: Defines agent teams and their capabilities
+- **RuntimeConfig**: Manages operational aspects of the service
+
+Each configuration type supports:
+- Version control 
+- Metadata (author, dates, description, tags)
+- Archiving/unarchiving
+- Cloning
+
+### Job Model
+A job represents a work unit that combines multiple configurations:
+- Jobs consist of references to configurations (WorkOrder, TeamConfig, RuntimeConfig)
+- Jobs progress through statuses: CREATED, SUBMITTED, RUNNING, COMPLETED, FAILED, CANCELLED
+- Jobs track creation, submission, and completion times
+- Jobs have configurable parameters (max runtime, notifications)
+- Jobs produce results (output, artifacts, metrics, errors)
 
 ## Configuration Type Registry
 
@@ -58,7 +80,7 @@ The backend maintains a registry of supported configuration types. New types can
 }
 ```
 
-## Enhanced API Endpoints
+## API Endpoints
 
 ### Health Check
 
@@ -125,6 +147,7 @@ GET /api/v1/configs/{configType}
 
 Parameters:
 - `configType`: The type of configuration (e.g., "workorder")
+- `archived` (optional): Filter by archived status (true/false)
 
 Returns a list of all configurations of the specified type.
 
@@ -204,6 +227,8 @@ Request Body:
 }
 ```
 
+Response: The created configuration object.
+
 #### Update Configuration
 
 ```
@@ -231,17 +256,19 @@ Request Body:
 }
 ```
 
+Response: The updated configuration object.
+
 #### Delete Configuration
 
 ```
-DELETE /api/v1/configs/{configType}/{configId}?commit_message={message}&author={author}
+DELETE /api/v1/configs/{configType}/{configId}
 ```
 
 Parameters:
 - `configType`: The type of configuration
 - `configId`: The identifier of the configuration
-- `commit_message`: Commit message for the deletion
-- `author`: Author of the commit
+- `commit_message` (query): Commit message for the deletion
+- `author` (query): Author of the commit
 
 #### Get Configuration History
 
@@ -253,12 +280,39 @@ Parameters:
 - `configType`: The type of configuration
 - `configId`: The identifier of the configuration
 
-Returns the version history of a configuration (if versioning is supported for the config type).
+Returns the version history of a configuration.
 
-#### Archive/Unarchive Configuration
+```json
+{
+  "config_id": "config-id",
+  "config_type": "workorder",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "commit_hash": "commit-hash",
+      "created_at": "2023-01-01T00:00:00.000000",
+      "author": "author-name",
+      "message": "Commit message"
+    }
+  ]
+}
+```
+
+#### Archive Configuration
 
 ```
 POST /api/v1/configs/{configType}/{configId}/archive
+```
+
+Parameters:
+- `configType`: The type of configuration
+- `configId`: The identifier of the configuration
+
+Marks a configuration as archived.
+
+#### Unarchive Configuration
+
+```
 POST /api/v1/configs/{configType}/{configId}/unarchive
 ```
 
@@ -266,7 +320,7 @@ Parameters:
 - `configType`: The type of configuration
 - `configId`: The identifier of the configuration
 
-Marks a configuration as archived or unarchived.
+Marks a configuration as unarchived.
 
 #### Clone Configuration
 
@@ -278,16 +332,88 @@ Parameters:
 - `configType`: The type of configuration
 - `configId`: The identifier of the configuration
 
-Request Body (optional):
+Request Body:
 ```json
 {
   "new_id": "cloned-config-id"
 }
 ```
 
-Creates a new configuration based on an existing one.
+Creates a new configuration based on an existing one. Returns the cloned configuration.
 
-### Enhanced Job Management
+### Job Management
+
+#### List Jobs
+
+```
+GET /api/v1/jobs
+```
+
+Parameters:
+- `config_id` (optional): Filter by configuration ID
+- `config_type` (optional): Filter by configuration type
+- `status` (optional): Filter by status
+- `user_id` (optional): Filter by user ID
+- `limit` (optional): Page size limit (default: 100)
+- `offset` (optional): Page offset (default: 0)
+
+Response:
+
+```json
+{
+  "items": [
+    {
+      "id": "job-id",
+      "configurations": {
+        "workorder": { "id": "workorder-id", "version": "1.0.0" },
+        "teamconfig": { "id": "teamconfig-id", "version": "1.0.0" },
+        "runtimeconfig": { "id": "runtimeconfig-id", "version": "1.0.0" }
+      },
+      "status": "running",
+      "service_job_id": "service-job-id",
+      "created_at": "2023-01-01T00:00:00.000000",
+      "updated_at": "2023-01-01T00:00:00.000000"
+    }
+  ],
+  "total": 10,
+  "limit": 100,
+  "offset": 0
+}
+```
+
+#### Get Job
+
+```
+GET /api/v1/jobs/{job_id}
+```
+
+Parameters:
+- `job_id`: The job identifier
+
+Returns status and details of a specific job, including all associated configurations.
+
+```json
+{
+  "id": "job-id",
+  "configurations": {
+    "workorder": { "id": "workorder-id", "version": "1.0.0" },
+    "teamconfig": { "id": "teamconfig-id", "version": "1.0.0" },
+    "runtimeconfig": { "id": "runtimeconfig-id", "version": "1.0.0" }
+  },
+  "status": "running",
+  "service_job_id": "service-job-id",
+  "created_at": "2023-01-01T00:00:00.000000",
+  "updated_at": "2023-01-01T00:00:00.000000",
+  "submitted_at": "2023-01-01T00:00:30.000000",
+  "completed_at": null,
+  "user_id": "user-id",
+  "job_configuration": {
+    "max_runtime": 3600,
+    "notify_on_completion": true
+  },
+  "result": null
+}
+```
 
 #### Submit Job with Multiple Configs
 
@@ -312,61 +438,18 @@ Request Body:
 }
 ```
 
-Response:
+Response: The created job object.
 
-```json
-{
-  "id": "job-id",
-  "configurations": {
-    "workorder": {
-      "id": "workorder-id",
-      "version": "1.0.0"
-    },
-    "teamconfig": {
-      "id": "teamconfig-id",
-      "version": "1.0.0"
-    },
-    "runtimeconfig": {
-      "id": "runtimeconfig-id",
-      "version": "1.0.0"
-    }
-  },
-  "status": "created",
-  "service_job_id": null,
-  "created_at": "2023-01-01T00:00:00.000000",
-  "updated_at": "2023-01-01T00:00:00.000000",
-  "submitted_at": null,
-  "completed_at": null,
-  "user_id": "user-id",
-  "job_configuration": {
-    "max_runtime": 3600,
-    "notify_on_completion": true
-  },
-  "result": null
-}
-```
-
-#### List Jobs
+#### Cancel Job
 
 ```
-GET /api/v1/jobs
+POST /api/v1/jobs/{job_id}/cancel
 ```
 
 Parameters:
-- `config_id` (optional): Filter by configuration ID
-- `config_type` (optional): Filter by configuration type
-- `status` (optional): Filter by status
-- `user_id` (optional): Filter by user ID
-- `limit` (optional): Page size limit (default: 100)
-- `offset` (optional): Page offset (default: 0)
+- `job_id`: The job identifier
 
-#### Get Job
-
-```
-GET /api/v1/jobs/{job_id}
-```
-
-Returns status and details of a specific job, including all associated configurations.
+Cancels a running job. This is only valid if the job is in CREATED, SUBMITTED, or RUNNING state.
 
 ## Data Models
 
@@ -422,17 +505,25 @@ The backend dynamically manages repositories based on configuration types:
 2. If no repository exists, a new one is created at the path specified in the configuration type registry.
 3. All CRUD operations for that configuration type are directed to the appropriate repository.
 
-## Implementation Notes
+## Business Rules
 
-1. The existing Git-based versioning system is reused but organized per configuration type.
-2. Schema validation occurs against the JSON schema registered for each configuration type.
-3. The API maintains backward compatibility with the original workorder endpoints for seamless transition.
-4. Configuration types can be added or modified through the configuration registry without code changes.
-5. Cross-configuration validation occurs during job submission to ensure compatibility between configurations.
+1. Configurations should be stored with version control (Git-based storage recommended)
+2. A job must include all required configuration types
+3. Job execution should validate compatibility between configurations
+4. Jobs should be cancelable only in certain states (CREATED, SUBMITTED, RUNNING)
+5. API responses should include appropriate error details when operations fail
+
+## Technical Requirements
+
+1. Use RESTful endpoint design
+2. Support JSON for all request/response formats
+3. Implement standard HTTP response codes
+4. All endpoints should include validation
+5. Configuration content should support YAML format
 
 ## Error Handling
 
-All API endpoints continue to return standard HTTP status codes with error details:
+All API endpoints return standard HTTP status codes with error details:
 
 ```json
 {
@@ -447,13 +538,9 @@ All API endpoints continue to return standard HTTP status codes with error detai
 }
 ```
 
-## Compatibility with Legacy Endpoints
+## Implementation Notes
 
-To ensure backward compatibility, the original workorder-specific endpoints are maintained as aliases to the generic configuration endpoints:
-
-```
-GET /api/v1/workorders => GET /api/v1/configs/workorder
-GET /api/v1/workorders/{id} => GET /api/v1/configs/workorder/{id}
-```
-
-This allows existing clients to continue functioning while new clients can use the generic, configuration-driven API.
+1. The Git-based versioning system is organized per configuration type
+2. Schema validation occurs against the JSON schema registered for each configuration type
+3. Configuration types can be added or modified through the configuration registry without code changes
+4. Cross-configuration validation occurs during job submission to ensure compatibility between configurations
