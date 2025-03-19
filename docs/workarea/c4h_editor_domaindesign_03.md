@@ -197,6 +197,12 @@ stateDiagram-v2
 
 ### Core Components
 
+Each of the sub configs such as workOrder, TeamConfig, RuntimeConfig represent a node under Jobs, hence described as a tuple.
+In the future there may be more nodes under job as we restructure the configs.
+There is NO merging required of configs on the client side.
+The client side only composes configs into a single Job Config.
+The C4h server is soley responsible for merging configs, based upon its own internal default configuration and the overrides of the external config.
+
 1. **WorkOrder**
    - Represents what needs to be done and against which asset
    - Contains intent description and project information
