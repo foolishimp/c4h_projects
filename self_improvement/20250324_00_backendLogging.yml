@@ -1,4 +1,4 @@
-# C4H Editor - WorkOrder Editor & Management Enhancements (Phase 1)
+# C4H Editor - Backend API Logging Implementation (Phase 1)
 
 # Project settings
 project:
@@ -8,67 +8,86 @@ project:
 # Intent description
 intent:
   description: |
-        # Root Cause Analysis: Backend API Logging Issues
+        # Backend API Logging Implementation with Multi-Level Detail
 
-        GOAL, implement comprehensive API request logging:
+        GOAL, implement comprehensive API request logging with both detailed and concise formats:
 
         ## Core Issues
 
-        1. **Insufficient API Request Logging**:
+        1. **Missing API Request Logging**:
           - There is no middleware configured to log all incoming HTTP requests
           - Current logging is inconsistent and doesn't capture all API calls
           - Cannot verify if frontend is making real API calls or using mock data
 
-        2. **Inconsistent Handler Logging**:
-          - Route handlers have some logging, but it's inconsistent
-          - Logs only appear if the handler executes successfully
-          - If a request fails early or hits a non-existent endpoint, nothing is logged
-
-        3. **Missing Error Logging Middleware**:
-          - No global error handling middleware to catch and log all exceptions consistently
+        2. **Missing Error Tracking**:
+          - No global error handling middleware to catch and log all exceptions
           - Error handling is fragmented across individual handlers
           - Cannot track failed requests systematically
 
-        ## Instructions for Correct Fix
+        ## Implementation Requirements
 
         1. **Implement Request Logging Middleware**:
           - Add FastAPI middleware to intercept and log ALL incoming HTTP requests
-          - Log method, URL, client IP, and timestamp for every request
-          - Use a correlation ID to track request-response pairs
+          - Generate correlation IDs to track request-response pairs
+          - Capture method, URL, client IP, headers, and timestamp for every request
 
-        2. **Ensure Response Logging**:
+        2. **Create Multi-Level Log Detail**:
+          - DEBUG level: Full structured JSON with complete request/response details
+          - INFO level: Concise summary format for operations (e.g., "[API] GET /api/v1/configs/workorder 200 45.2ms (3f7a9b2c)")
+          - WARNING level: Client errors (4xx responses)
+          - ERROR level: Server errors (5xx responses) and exceptions
+
+        3. **Implement Response Logging**:
           - Log all responses with status codes and timing information
-          - Properly handle both successful and error responses
-          - Maintain the request-response correlation
+          - Use appropriate log levels based on status code
+          - Include performance metrics (request duration)
 
-        3. **Create Structured Logging Format**:
-          - Use a consistent, structured logging format (preferably JSON)
-          - Include enough context for debugging issues
-          - Ensure machine-readability for log analysis
+        4. **Add Global Exception Handling**:
+          - Create error handling middleware to catch all unhandled exceptions
+          - Log exceptions with correlation IDs and stack traces
+          - Return appropriate error responses to clients
 
-        4. **Implement Proper Error Handling**:
-          - Add global exception handling middleware
-          - Log all exceptions with appropriate context
-          - Use appropriate log levels (INFO for normal requests, ERROR for exceptions)
+        5. **Create Structured JSON Logging**:
+          - Implement a JsonFormatter for detailed logs
+          - Support machine-readable logs for log aggregation tools
+          - Enable filtering and searching in log analysis systems
 
-        5. **Avoid Logging Sensitive Information**:
-          - Don't log authentication tokens or credentials
-          - Implement sanitization for potentially sensitive query parameters
-          - Follow security best practices for logging
+        6. **Ensure Security Best Practices**:
+          - Sanitize sensitive information (auth tokens, credentials)
+          - Implement redaction for sensitive headers and data
+          - Follow OWASP guidelines for secure logging
 
-        6. **Minimize Performance Impact**:
-          - Ensure logging implementation is efficient
-          - Consider asynchronous logging for high-traffic environments
-          - Log at appropriate levels to avoid excessive output
+        7. **Optimize for Development and Operations**:
+          - Make INFO level logs human-readable and concise
+          - Ensure DEBUG level logs contain all details needed for troubleshooting
+          - Add visual cues (prefixes, markers) for easy log scanning
 
-        7. **Enable Debugging of Frontend-Backend Communication**:
-          - Log enough information to verify API calls from frontend
-          - Include details that help troubleshoot communication issues
-          - Implement clear patterns to distinguish between different request sources
+        ## Implementation Components
 
-        The essential fix is to implement comprehensive request logging that captures every API 
-        interaction, making it possible to verify if the frontend is making real API calls or 
-        using mock data, and to debug any communication issues between components.
+        1. **Request Logging Middleware**:
+           - Intercept all requests and responses
+           - Generate and attach correlation IDs
+           - Log at appropriate levels based on context
+
+        2. **Error Handling Middleware**:
+           - Catch and log all unhandled exceptions
+           - Maintain correlation IDs across the request lifecycle
+           - Return standardized error responses
+
+        3. **Logging Configuration**:
+           - Set up structured JSON logging
+           - Configure log levels and formatting
+           - Support both development and production environments
+
+        4. **Application Integration**:
+           - Add middlewares to FastAPI application
+           - Configure proper startup and shutdown
+           - Ensure logging is initialized early in the application lifecycle
+
+        The essential implementation is to create a comprehensive logging system that
+        captures all API interactions at different detail levels, enabling easy verification
+        of frontend-backend communication while providing both detailed debugging information
+        and concise operational summaries.
 
 # LLM configuration
 llm_config:
