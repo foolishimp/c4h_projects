@@ -2,7 +2,7 @@
 
 # Project settings
 project:
-  path: "/Users/jim/src/apps/c4h_editor"
+  path: "/Users/jim/src/apps/c4h_editor/backend"
   workspace_root: "workspaces"
 
 # Intent description

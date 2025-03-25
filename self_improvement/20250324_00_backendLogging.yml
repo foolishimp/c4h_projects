@@ -1,0 +1,128 @@
+# C4H Editor - WorkOrder Editor & Management Enhancements (Phase 1)
+
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor/backend"
+  workspace_root: "workspaces"
+
+# Intent description
+intent:
+  description: |
+        # Root Cause Analysis: Backend API Logging Issues
+
+        GOAL, implement comprehensive API request logging:
+
+        ## Core Issues
+
+        1. **Insufficient API Request Logging**:
+          - There is no middleware configured to log all incoming HTTP requests
+          - Current logging is inconsistent and doesn't capture all API calls
+          - Cannot verify if frontend is making real API calls or using mock data
+
+        2. **Inconsistent Handler Logging**:
+          - Route handlers have some logging, but it's inconsistent
+          - Logs only appear if the handler executes successfully
+          - If a request fails early or hits a non-existent endpoint, nothing is logged
+
+        3. **Missing Error Logging Middleware**:
+          - No global error handling middleware to catch and log all exceptions consistently
+          - Error handling is fragmented across individual handlers
+          - Cannot track failed requests systematically
+
+        ## Instructions for Correct Fix
+
+        1. **Implement Request Logging Middleware**:
+          - Add FastAPI middleware to intercept and log ALL incoming HTTP requests
+          - Log method, URL, client IP, and timestamp for every request
+          - Use a correlation ID to track request-response pairs
+
+        2. **Ensure Response Logging**:
+          - Log all responses with status codes and timing information
+          - Properly handle both successful and error responses
+          - Maintain the request-response correlation
+
+        3. **Create Structured Logging Format**:
+          - Use a consistent, structured logging format (preferably JSON)
+          - Include enough context for debugging issues
+          - Ensure machine-readability for log analysis
+
+        4. **Implement Proper Error Handling**:
+          - Add global exception handling middleware
+          - Log all exceptions with appropriate context
+          - Use appropriate log levels (INFO for normal requests, ERROR for exceptions)
+
+        5. **Avoid Logging Sensitive Information**:
+          - Don't log authentication tokens or credentials
+          - Implement sanitization for potentially sensitive query parameters
+          - Follow security best practices for logging
+
+        6. **Minimize Performance Impact**:
+          - Ensure logging implementation is efficient
+          - Consider asynchronous logging for high-traffic environments
+          - Log at appropriate levels to avoid excessive output
+
+        7. **Enable Debugging of Frontend-Backend Communication**:
+          - Log enough information to verify API calls from frontend
+          - Include details that help troubleshoot communication issues
+          - Implement clear patterns to distinguish between different request sources
+
+        The essential fix is to implement comprehensive request logging that captures every API 
+        interaction, making it possible to verify if the frontend is making real API calls or 
+        using mock data, and to debug any communication issues between components.
+
+# LLM configuration
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      tartxt_config:
+        input_paths:
+          - "frontend/src"
+          - "backend_api.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/TypeScript_Design_Principles.md"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219" 
+      temperature: 0.7
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: true
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+  truncate:
+    prefix_length: 30
+    suffix_length: 30

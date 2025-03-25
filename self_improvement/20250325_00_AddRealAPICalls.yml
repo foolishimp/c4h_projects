@@ -1,0 +1,135 @@
+# C4H Editor - Frontend API Integration Enhancements (Phase 1)
+
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor/c4h-micro"
+  workspace_root: "workspaces"
+
+# Intent description
+intent:
+  description: |
+        # Root Cause Analysis: Frontend Mock API Usage Issues
+
+        GOAL, refactor frontend API calls to remove mock data and use the real backend:
+
+        ## Core Issues
+
+        1. **Mock Data Usage in API Service**:
+          - The apiService.ts uses mock data objects instead of making real HTTP requests
+          - This prevents actual communication with the backend API
+          - Frontend appears functional but is operating in isolation from the backend
+
+        2. **Inconsistent API Access Patterns**:
+          - Different microfrontends use inconsistent patterns to access the API
+          - Some use direct api.get/post calls, others use apiService methods
+          - This inconsistency makes it difficult to fix API communication globally
+
+        3. **Response Structure Assumptions**:
+          - Frontend components assume specific response structures that may not match backend
+          - JobContext expects response.items directly rather than response.data.items
+          - These mismatches will cause errors when switching to real API calls
+
+        4. **Legacy Endpoint References**:
+          - apiService.ts contains backward compatibility endpoints that might not match current backend
+          - Some components may still be using these legacy endpoints
+          - This creates confusion and potential compatibility issues
+
+        ## Instructions for Correct Fix
+
+        1. **Remove Mock Data Implementation**:
+          - Remove the mockData objects and mockJobs arrays from apiService.ts
+          - Replace all mock data methods with real HTTP requests to the backend
+          - Ensure the API_BASE_URL is properly configured to point to the backend
+
+        2. **Standardize API Access Pattern**:
+          - Make apiService the single point of access for all backend communication
+          - Update all direct axios calls to use apiService methods instead
+          - Define clear, consistent method signatures for all API operations
+
+        3. **Align with Backend Response Structure**:
+          - Update response handling to match actual backend response structures
+          - Fix JobContext to handle the correct structure for job listings and details
+          - Create proper TypeScript interfaces for all API responses
+
+        4. **Update Endpoint References**:
+          - Ensure all endpoints match the current backend API structure
+          - Refactor or remove legacy endpoint references
+          - Use the configTypes registry for dynamically building correct endpoints
+
+        5. **Add Error Handling and Retries**:
+          - Implement proper error handling for all API calls
+          - Add retry logic for transient failures
+          - Show appropriate user feedback for API errors
+
+        6. **Enable API URL Configuration**:
+          - Make API base URL configurable via environment variables
+          - Add proper environment configuration for different deployment scenarios
+          - Document the configuration requirements
+
+        7. **Add Request/Response Logging**:
+          - Add debug logging for all API requests and responses
+          - Ensure sensitive data is not logged
+          - Use consistent logging patterns across all API calls
+
+        The essential fix is to completely remove the mock data implementation and ensure 
+        all frontend components communicate with the real backend API using consistent 
+        patterns and proper error handling, while correctly handling the actual response 
+        structures from the backend.
+
+# LLM configuration
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      tartxt_config:
+        input_paths:
+          - "packages/shared/src"
+          - "packages/config-selector/src"
+          - "packages/job-management/src"
+          - "packages/yaml-editor/src"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219" 
+      temperature: 0.7
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: true
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+  truncate:
+    prefix_length: 30
+    suffix_length: 30
