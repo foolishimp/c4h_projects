@@ -232,10 +232,10 @@ Markov blankets or partial boundaries can help localize tasks. A “danger” su
 ```mermaid
 flowchart LR
     subgraph ModularSystem
-    A[Constraint Module] --> B[Symbolic Checker]
-    B --> C[Probabilistic Core (LLM)]
-    C --> D[Contextual Selector]
-    D --> A
+        A[Constraint Module] --> B[Symbolic Checker]
+        B --> C[Probabilistic Core - LLM]
+        C --> D[Contextual Selector]
+        D --> A
     end
     A --> Output((Unified Reasoning Output))
 ```
