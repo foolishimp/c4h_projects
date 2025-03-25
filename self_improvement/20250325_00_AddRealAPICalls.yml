@@ -35,6 +35,12 @@ intent:
           - This creates confusion and potential compatibility issues
 
         ## Instructions for Correct Fix
+        READ THE TYPESCRIPT DESIGN PRINCIPLES DOCUMENT 
+        Make sure to follow the principles outlined in the Typescript_Design_Principles.md document, 
+        so as to ensure that all types are defined for the refactored code.
+
+        For each file refactored, compare it against the oringal code to make sure no functionality is lost.
+        For each file refactored, make sure all imports are correct and meet the typescript design principles.
 
         1. **Remove Mock Data Implementation**:
           - Remove the mockData objects and mockJobs arrays from apiService.ts
@@ -89,8 +95,8 @@ llm_config:
         input_paths:
           - "packages/shared/src"
           - "packages/config-selector/src"
-          - "packages/job-management/src"
           - "packages/yaml-editor/src"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Typescript_Design_Principles.md"
         exclusions:
           - "**/node_modules/**"
           - "**/.git/**"
