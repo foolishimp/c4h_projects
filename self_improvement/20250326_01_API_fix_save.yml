@@ -1,0 +1,121 @@
+# C4H Editor - Frontend API Integration Enhancements (Phase 1)
+
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor/"
+  workspace_root: "workspaces"
+
+# Fix C4H Editor Type Mismatch and API Validation Issues
+
+intent:
+  description: |
+      ```yaml
+# Fix Interface-Implementation Type Mismatch in ConfigTypeMetadata
+
+intent:
+  description: |
+    There's a critical type mismatch between the ConfigTypeMetadata interface and its implementations:
+    
+    - Interface expects FUNCTIONS: `get: (id: string) => string`
+    - Implementations now use STRING TEMPLATES: `get: "/api/v1/configs/workflow/{id}"`
+    
+    Error messages confirm this reverse mismatch: "Type 'string' is not assignable to type '(id: string) => string'"
+    
+    The solution requires updating the INTERFACE definition to match the current implementation approach.
+
+      tasks:
+        - Update ConfigTypeMetadata interface (around line 15) to use string types instead of function types
+        - Keep the string template implementations already in place
+        - Verify apiService.formatEndpoint correctly processes these templates
+        - Ensure all config types (workorder, teamconfig, runtimeconfig, workflow) are consistent
+
+      code_changes:
+        - File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared/src/config/configTypes.ts
+          Change:
+            FROM:
+            ```typescript
+            export interface ConfigTypeMetadata {
+              // ...
+              apiEndpoints: {
+                list: string;
+                get: (id: string) => string;
+                create: string;
+                update: (id: string) => string;
+                delete: (id: string) => string;
+                archive: (id: string) => string;
+                unarchive: (id: string) => string;
+                clone: (id: string) => string;
+                history: (id: string) => string;
+                render?: (id: string) => string;
+                test?: (id: string) => string;
+              };
+              // ...
+            }
+            ```
+            TO:
+            ```typescript
+            export interface ConfigTypeMetadata {
+              // ...
+              apiEndpoints: {
+                list: string;
+                get: string;
+                create: string;
+                update: string;
+                delete: string;
+                archive: string;
+                unarchive: string;
+                clone: string;
+                history: string;
+                render?: string;
+                test?: string;
+              };
+              // ...
+            }
+            ```
+
+# LLM configuration
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      tartxt_config:
+        input_paths:
+          - "c4h-micro/packages/"
+          - "backend/c4h_config_api.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Typescript_Design_Principles.md"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+          - "**/__pycache__/**"
+          - "**/*.pyc"
+          - "**/package-lock.json"
+          - "**/dist/**"
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: true
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+  truncate:
+    prefix_length: 30
+    suffix_length: 30

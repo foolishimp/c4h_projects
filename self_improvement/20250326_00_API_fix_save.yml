@@ -2,70 +2,55 @@
 
 # Project settings
 project:
-  path: "/Users/jim/src/apps/c4h_editor/c4h-micro"
+  path: "/Users/jim/src/apps/c4h_editor/"
   workspace_root: "workspaces"
 
-# Intent description
+# Fix C4H Editor Type Mismatch and API Validation Issues
+
 intent:
   description: |
-    # Fix 422 Validation Error in TeamConfig API Integration
+      Fix all remaining type mismatches in configTypes.ts, particularly in the workflow section (lines 173-180).
+      Previous fixes addressed other sections but missed the workflow config type.
+      
+      ## Current Architecture
+      - ConfigTypeMetadata interface defines endpoint properties as strings (not functions)
+      - A formatEndpoint helper method has been added to apiService.ts to handle {id} substitution
+      - Most config types have been converted but workflow section still uses function endpoints
+      
+      ## Error Pattern
+      Every endpoint property in workflow section generates:
+      "Type '(id: string) => string' is not assignable to type 'string'" errors
 
-    ## Core Issue
-    The current implementation is causing a 422 (Unprocessable Entity) error when creating/updating TeamConfig objects because the content structure in the client doesn't match the schema expected by the API.
+      ## Required Solution Pattern
+      1. Convert each function endpoint to a string template with {id} placeholders
+      2. Ensure apiService can resolve these placeholders using the formatEndpoint helper
+      3. Ensure all properties required by ConfigTypeMetadata are present
 
-    ## Error Details
-    When saving a TeamConfig with ID "0001", the request fails with a 422 validation error because:
-    - Client sends a structure with `llm_config` and `orchestration` fields
-    - API expects a structure with `roles`, `teams`, and `global_config` fields
+      tasks:
+        - Update ALL endpoint methods in workflow section to string templates
+        - Follow exact same pattern implemented for workorder, teamconfig, and runtimeconfig
+        - Verify the workflow section has requiredForJob property set
+        - Check for any other configType implementations that might have been missed
+        - Ensure consistent naming pattern across all sections
+        - Verify the defaultContent structure is appropriate for workflow type
 
-    ## Current Implementation (in configTypes.ts)
-    ```typescript
-    defaultContent: {
-      llm_config: {
-        providers: [],
-        default_provider: "",
-        default_model: ""
-      },
-      orchestration: {
-        enabled: true,
-        teams: []
-      },
-      metadata: {...}
-    }
-    ```
-
-    ## Required API Schema (from API docs)
-    ```typescript
-    interface TeamConfigContent {
-      roles: Array<{
-        name: string;
-        description?: string;
-        capabilities: string[];
-        model?: string;
-        config: Record<string, any>;
-      }>;
-      teams: Array<{
-        name: string;
-        description?: string;
-        agents: Array<{
-          id: string;
-          name: string;
-          role: string;
-          description?: string;
-          config: Record<string, any>;
-        }>;
-        workflow?: Record<string, any>;
-      }>;
-      default_team?: string;
-      global_config: Record<string, any>;
-    }
-    ```
-    tasks:
-      - Update `defaultContent` in configTypes.ts for `teamconfig` to match the expected API schema
-      - Ensure the structure matches exactly what the backend validation expects
-      - Follow TypeScript design principles, especially type safety
-      - Maintain backward compatibility with any UI components expecting the old structure if necessary
-      - The fix should focus on the data structure, not the API calling code itself
+      examples:
+        - Change: `get: (id) => \`/api/v1/configs/workflow/${id}\`` → `get: "/api/v1/configs/workflow/{id}"`
+        - Change: `archive: (id) => \`/api/v1/configs/workflow/${id}/archive\`` → `archive: "/api/v1/configs/workflow/{id}/archive"`
+        - Complete template:
+          ```typescript
+          apiEndpoints: {
+            list: "/api/v1/configs/workflow",
+            get: "/api/v1/configs/workflow/{id}",
+            create: "/api/v1/configs/workflow",
+            update: "/api/v1/configs/workflow/{id}",
+            delete: "/api/v1/configs/workflow/{id}",
+            archive: "/api/v1/configs/workflow/{id}/archive",
+            unarchive: "/api/v1/configs/workflow/{id}/unarchive",
+            clone: "/api/v1/configs/workflow/{id}/clone",
+            history: "/api/v1/configs/workflow/{id}/history"
+          }
+        ```
 
 # LLM configuration
 llm_config:
@@ -78,27 +63,16 @@ llm_config:
       model: "claude-3-5-sonnet-20241022"
       tartxt_config:
         input_paths:
-          - "packages/shared/src"
-          - "packages/config-selector/src"
-          - "packages/yaml-editor/src"
+          - "c4h-micro/packages/"
+          - "backend/c4h_config_api.md"
           - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Typescript_Design_Principles.md"
         exclusions:
           - "**/node_modules/**"
           - "**/.git/**"
-    
-    solution_designer:
-      provider: "anthropic"
-      model: "claude-3-7-sonnet-20250219" 
-      temperature: 0.7
-      extended_thinking:
-        enabled: true
-        budget_tokens: 32000
-    
-    coder:
-      provider: "anthropic"
-      model: "claude-3-7-sonnet-20250219"
-      temperature: 0
-      backup_enabled: true
+          - "**/__pycache__/**"
+          - "**/*.pyc"
+          - "**/package-lock.json"
+          - "**/dist/**"
 
 # Runtime configuration
 runtime:
