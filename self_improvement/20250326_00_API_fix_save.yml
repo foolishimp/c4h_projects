@@ -1,0 +1,126 @@
+# C4H Editor - Frontend API Integration Enhancements (Phase 1)
+
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor/c4h-micro"
+  workspace_root: "workspaces"
+
+# Intent description
+intent:
+  description: |
+    # Fix 422 Validation Error in TeamConfig API Integration
+
+    ## Core Issue
+    The current implementation is causing a 422 (Unprocessable Entity) error when creating/updating TeamConfig objects because the content structure in the client doesn't match the schema expected by the API.
+
+    ## Error Details
+    When saving a TeamConfig with ID "0001", the request fails with a 422 validation error because:
+    - Client sends a structure with `llm_config` and `orchestration` fields
+    - API expects a structure with `roles`, `teams`, and `global_config` fields
+
+    ## Current Implementation (in configTypes.ts)
+    ```typescript
+    defaultContent: {
+      llm_config: {
+        providers: [],
+        default_provider: "",
+        default_model: ""
+      },
+      orchestration: {
+        enabled: true,
+        teams: []
+      },
+      metadata: {...}
+    }
+    ```
+
+    ## Required API Schema (from API docs)
+    ```typescript
+    interface TeamConfigContent {
+      roles: Array<{
+        name: string;
+        description?: string;
+        capabilities: string[];
+        model?: string;
+        config: Record<string, any>;
+      }>;
+      teams: Array<{
+        name: string;
+        description?: string;
+        agents: Array<{
+          id: string;
+          name: string;
+          role: string;
+          description?: string;
+          config: Record<string, any>;
+        }>;
+        workflow?: Record<string, any>;
+      }>;
+      default_team?: string;
+      global_config: Record<string, any>;
+    }
+    ```
+    tasks:
+      - Update `defaultContent` in configTypes.ts for `teamconfig` to match the expected API schema
+      - Ensure the structure matches exactly what the backend validation expects
+      - Follow TypeScript design principles, especially type safety
+      - Maintain backward compatibility with any UI components expecting the old structure if necessary
+      - The fix should focus on the data structure, not the API calling code itself
+
+# LLM configuration
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      tartxt_config:
+        input_paths:
+          - "packages/shared/src"
+          - "packages/config-selector/src"
+          - "packages/yaml-editor/src"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Typescript_Design_Principles.md"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+    
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219" 
+      temperature: 0.7
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    
+    coder:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 0
+      backup_enabled: true
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: true
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+  truncate:
+    prefix_length: 30
+    suffix_length: 30
