@@ -6,51 +6,27 @@ project:
   workspace_root: "workspaces"
 
 # Fix C4H Editor Type Mismatch and API Validation Issues
-
 intent:
   description: |
-      Fix all remaining type mismatches in configTypes.ts, particularly in the workflow section (lines 173-180).
-      Previous fixes addressed other sections but missed the workflow config type.
-      
-      ## Current Architecture
-      - ConfigTypeMetadata interface defines endpoint properties as strings (not functions)
-      - A formatEndpoint helper method has been added to apiService.ts to handle {id} substitution
-      - Most config types have been converted but workflow section still uses function endpoints
-      
-      ## Error Pattern
-      Every endpoint property in workflow section generates:
-      "Type '(id: string) => string' is not assignable to type 'string'" errors
+    TeamConfig Validation Error (422)
+    
+    The C4H Editor is experiencing a validation error (422 Unprocessable Entity) when saving TeamConfig objects. 
+    
+    Review the error logs:
+    ```
+    POST http://localhost:8000/api/v1/configs/teamconfig 422 (Unprocessable Entity)
+    API Error: {detail: Array(2)}
+    Error saving configuration: AxiosError {message: 'Request failed with status code 422'}
+    ```
+    
+    The likely cause is a mismatch between our client-side data structure and what the API expects.
 
-      ## Required Solution Pattern
-      1. Convert each function endpoint to a string template with {id} placeholders
-      2. Ensure apiService can resolve these placeholders using the formatEndpoint helper
-      3. Ensure all properties required by ConfigTypeMetadata are present
-
-      tasks:
-        - Update ALL endpoint methods in workflow section to string templates
-        - Follow exact same pattern implemented for workorder, teamconfig, and runtimeconfig
-        - Verify the workflow section has requiredForJob property set
-        - Check for any other configType implementations that might have been missed
-        - Ensure consistent naming pattern across all sections
-        - Verify the defaultContent structure is appropriate for workflow type
-
-      examples:
-        - Change: `get: (id) => \`/api/v1/configs/workflow/${id}\`` → `get: "/api/v1/configs/workflow/{id}"`
-        - Change: `archive: (id) => \`/api/v1/configs/workflow/${id}/archive\`` → `archive: "/api/v1/configs/workflow/{id}/archive"`
-        - Complete template:
-          ```typescript
-          apiEndpoints: {
-            list: "/api/v1/configs/workflow",
-            get: "/api/v1/configs/workflow/{id}",
-            create: "/api/v1/configs/workflow",
-            update: "/api/v1/configs/workflow/{id}",
-            delete: "/api/v1/configs/workflow/{id}",
-            archive: "/api/v1/configs/workflow/{id}/archive",
-            unarchive: "/api/v1/configs/workflow/{id}/unarchive",
-            clone: "/api/v1/configs/workflow/{id}/clone",
-            history: "/api/v1/configs/workflow/{id}/history"
-          }
-        ```
+    tasks:
+      - Review the C4H Config API documentation to understand proper schema requirements
+      - Follow TypeScript Design Principles Design Document when implementing the fix
+      - Examine the configTypes.ts defaultContent for teamconfig
+      - Update implementation to align with API expectations
+      - Ensure all type definitions are correct and consistent
 
 # LLM configuration
 llm_config:
