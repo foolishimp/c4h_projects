@@ -6,7 +6,7 @@ This document aligns and refines an earlier revision with the original proposal 
 1. We clarify that **“soft unification”** does **not** reduce merely to “statistical unification” across a “unified logical topology”; rather, attention in Transformers provides a *continuous matching mechanism* that *dynamically* constrains (and is itself constrained by) context, partially paralleling Prolog’s discrete unification—but without requiring a monolithic or globally unified logical space.
 2. We emphasize that the **Markov blankets** or *boundaries* that emerge around conceptual clusters are *proto-symbolic*, not strictly top-down symbolic or hierarchical, and do not necessarily yield “fully logical” partitions. They constrain reasoning by *partially separating* internal representations from external influences, approximating *symbol-like* boundaries in high-dimensional space.
 
-These corrections bring the discussion back in line with the original argument that LLMs’ reasoning-like behavior is shaped by **dynamic, probabilistic constraints**—where *attention acts as a flexible unification mechanism*—rather than by a single, static “logical topology.”
+The argument is that LLMs’ reasoning-like behavior is shaped by **dynamic, probabilistic constraints**—where *attention acts as a flexible unification mechanism*—rather than by a single, static “logical topology.”
 
 ---
 
