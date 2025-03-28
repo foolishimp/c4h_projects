@@ -1,5 +1,7 @@
 # **Emergent Reasoning in Large Language Models: Soft Unification, Constraint Mechanisms, and Computational Traversal**
 
+### Author: Dimitar Popov
+
 ## **Abstract**
 This document aligns and refines an earlier revision with the original proposal that **Large Language Models (LLMs)** exhibit something akin to *symbolic reasoning* through **soft unification**, constrained by attention mechanisms. We retain useful elements such as illustrations of **Constraint Satisfaction Problems (CSPs)**, **Markov blankets**, and **logical topologies**, but correct two key misrepresentations about the nature of unification and emergent constraints in LLMs. Specifically:
 

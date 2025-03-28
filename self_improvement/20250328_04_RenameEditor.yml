@@ -1,0 +1,81 @@
+# C4H Editor - Save & Load Config Description
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor/"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+      GOAL: On the main browser page of the Shell, update the Heading Banner from "C4H Editor" to be - "Visual Prompt Studio, C4H Editor"
+      - "Visual Prompt Studio", should be in a large font,  
+      - "C4H Editor" text should be in a smaller font, either below or to the right aligned with the page
+
+      CONTEXT: Read the editor generic config, config service API & TypeScript design principles for context.
+        - The backend server code is included so you can review the APIs and their implmentation
+        - this will allow you to fix any problems backend python server, and align the API between backend and frontend for loading the config list
+      
+      APPROACH:
+      1. Trace the complete data flow for description fields from UI → API → Backend → Storage → API → UI
+      2. Identify ALL potential failure points across the entire stack
+      3. Fix EACH component ensuring correct handling of the description field
+      4. Document your complete investigation and append to a ChangeLog.md, if the file does not exist, create it.
+      
+      DELIVERABLES:
+      - ALL modified files in the correct format for processing
+      - Append to the ChagneLog.md a comprehensive description in the project folder documenting:
+        - Problem description and impact
+        - All files refactored and the changes made to each file
+      
+
+      Examine the ENTIRE workflow including server response. Don't focus only on a single file.
+      Assume the backend might be working correctly - validate with the provided logs.
+
+# LLM configuration
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      tartxt_config:
+        input_paths:
+          - "/Users/jim/src/apps/c4h_editor/c4h-micro/packages"
+          - "/Users/jim/src/apps/c4h_editor/backend"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Typescript_Design_Principles.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/workarea/c4h_editor_generic_config_01.md"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+          - "**/__pycache__/**"
+          - "**/*.pyc"
+          - "**/package-lock.json"
+          - "**/dist/**"
+          - "**/.DS_Store"
+          - "**/README.md"
+          - "**/workspaces/**"
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: false
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+  truncate:
+    prefix_length: 100
+    suffix_length: 100

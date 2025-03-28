@@ -1,0 +1,65 @@
+# C4H Editor - Clean up side menu
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor/"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    read the editor generic config, config api & typescript 
+    design principles for context
+ 
+    we are cleaing up tech debt in the sidebar
+
+    There is currently a 'Workflow' side menu item that is not configured, and i want to completley remove its reference
+    from the sidebar and as a config creation option
+
+# LLM configuration
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      tartxt_config:
+        input_paths:
+          - "/Users/jim/src/apps/c4h_editor/c4h-micro/packages"
+          - "/Users/jim/src/apps/c4h_editor/backend/c4h_config_api.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Typescript_Design_Principles.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/workarea/c4h_editor_generic_config_01.md"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+          - "**/__pycache__/**"
+          - "**/*.pyc"
+          - "**/package-lock.json"
+          - "**/dist/**"
+          - "**/.DS_Store"
+          - "**/README.md"
+          - "**/workspaces/**"
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: false
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: false
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+  truncate:
+    prefix_length: 100
+    suffix_length: 100

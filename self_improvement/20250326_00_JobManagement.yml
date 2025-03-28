@@ -1,0 +1,351 @@
+# C4H Editor - Frontend fix Job Management
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor/"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    read the editor generic config, config api & typescript 
+    design principles for context
+    we are refactoring job management ui to comply to api i want to fix 
+    the following browser errors.
+
+    I need to be able to create a Job, each of the drop downs a list the 
+    work orders, team configs, runtime configs.
+
+    The Root Issue
+      The main error is: Cannot read properties of undefined (reading 'map'). 
+      This is happening because when loading config options for different types, 
+      it's trying to map over response.data which is undefined. This suggests the API 
+      response structure doesn't match what the code expects.
+
+    API: Fetching configs for type: workorder from /api/v1/configs/workorder
+    __federation_expose_JobManager.js:158  Error loading workorder options: TypeError: Cannot read properties of undefined (reading 'map')
+        at loadConfigOptions (__federation_expose_JobManager.js:153:47)
+    loadConfigOptions @ __federation_expose_JobManager.js:158
+    await in loadConfigOptions
+    (anonymous) @ __federation_expose_JobManager.js:164
+    commitHookEffectListMount @ react-dom.development.js:23189
+    commitPassiveMountOnFiber @ react-dom.development.js:24965
+    commitPassiveMountEffects_complete @ react-dom.development.js:24930
+    commitPassiveMountEffects_begin @ react-dom.development.js:24917
+    commitPassiveMountEffects @ react-dom.development.js:24905
+    flushPassiveEffectsImpl @ react-dom.development.js:27078
+    flushPassiveEffects @ react-dom.development.js:27023
+    performSyncWorkOnRoot @ react-dom.development.js:26115
+    flushSyncCallbacks @ react-dom.development.js:12042
+    commitRootImpl @ react-dom.development.js:26998
+    commitRoot @ react-dom.development.js:26721
+    finishConcurrentRender @ react-dom.development.js:26020
+    performConcurrentWorkOnRoot @ react-dom.development.js:25848
+    workLoop @ scheduler.development.js:266
+    flushWork @ scheduler.development.js:239
+    performWorkUntilDeadline @ scheduler.development.js:533
+    __federation_expose_JobManager.js:158  Error loading workorder options: TypeError: Cannot read properties of undefined (reading 'map')
+        at loadConfigOptions (__federation_expose_JobManager.js:153:47)
+    loadConfigOptions @ __federation_expose_JobManager.js:158
+    await in loadConfigOptions
+    (anonymous) @ __federation_expose_JobManager.js:164
+    commitHookEffectListMount @ react-dom.development.js:23189
+    invokePassiveEffectMountInDEV @ react-dom.development.js:25193
+    invokeEffectsInDev @ react-dom.development.js:27390
+    commitDoubleInvokeEffectsInDEV @ react-dom.development.js:27369
+    flushPassiveEffectsImpl @ react-dom.development.js:27095
+    flushPassiveEffects @ react-dom.development.js:27023
+    performSyncWorkOnRoot @ react-dom.development.js:26115
+    flushSyncCallbacks @ react-dom.development.js:12042
+    commitRootImpl @ react-dom.development.js:26998
+    commitRoot @ react-dom.development.js:26721
+    finishConcurrentRender @ react-dom.development.js:26020
+    performConcurrentWorkOnRoot @ react-dom.development.js:25848
+    workLoop @ scheduler.development.js:266
+    flushWork @ scheduler.development.js:239
+    performWorkUntilDeadline @ scheduler.development.js:533
+    __federation_expose_JobManager.js:158  Error loading teamconfig options: TypeError: Cannot read properties of undefined (reading 'map')
+        at loadConfigOptions (__federation_expose_JobManager.js:153:47)
+    loadConfigOptions @ __federation_expose_JobManager.js:158
+    await in loadConfigOptions
+    (anonymous) @ __federation_expose_JobManager.js:164
+    commitHookEffectListMount @ react-dom.development.js:23189
+    commitPassiveMountOnFiber @ react-dom.development.js:24965
+    commitPassiveMountEffects_complete @ react-dom.development.js:24930
+    commitPassiveMountEffects_begin @ react-dom.development.js:24917
+    commitPassiveMountEffects @ react-dom.development.js:24905
+    flushPassiveEffectsImpl @ react-dom.development.js:27078
+    flushPassiveEffects @ react-dom.development.js:27023
+    performSyncWorkOnRoot @ react-dom.development.js:26115
+    flushSyncCallbacks @ react-dom.development.js:12042
+    commitRootImpl @ react-dom.development.js:26998
+    commitRoot @ react-dom.development.js:26721
+    finishConcurrentRender @ react-dom.development.js:26020
+    performConcurrentWorkOnRoot @ react-dom.development.js:25848
+    workLoop @ scheduler.development.js:266
+    flushWork @ scheduler.development.js:239
+    performWorkUntilDeadline @ scheduler.development.js:533
+    __federation_expose_JobManager.js:158  Error loading teamconfig options: TypeError: Cannot read properties of undefined (reading 'map')
+        at loadConfigOptions (__federation_expose_JobManager.js:153:47)
+    loadConfigOptions @ __federation_expose_JobManager.js:158
+    await in loadConfigOptions
+    (anonymous) @ __federation_expose_JobManager.js:164
+    commitHookEffectListMount @ react-dom.development.js:23189
+    invokePassiveEffectMountInDEV @ react-dom.development.js:25193
+    invokeEffectsInDev @ react-dom.development.js:27390
+    commitDoubleInvokeEffectsInDEV @ react-dom.development.js:27369
+    flushPassiveEffectsImpl @ react-dom.development.js:27095
+    flushPassiveEffects @ react-dom.development.js:27023
+    performSyncWorkOnRoot @ react-dom.development.js:26115
+    flushSyncCallbacks @ react-dom.development.js:12042
+    commitRootImpl @ react-dom.development.js:26998
+    commitRoot @ react-dom.development.js:26721
+    finishConcurrentRender @ react-dom.development.js:26020
+    performConcurrentWorkOnRoot @ react-dom.development.js:25848
+    workLoop @ scheduler.development.js:266
+    flushWork @ scheduler.development.js:239
+    performWorkUntilDeadline @ scheduler.development.js:533
+    __federation_expose_JobManager.js:158  Error loading runtimeconfig options: TypeError: Cannot read properties of undefined (reading 'map')
+        at loadConfigOptions (__federation_expose_JobManager.js:153:47)
+    loadConfigOptions @ __federation_expose_JobManager.js:158
+    await in loadConfigOptions
+    (anonymous) @ __federation_expose_JobManager.js:164
+    commitHookEffectListMount @ react-dom.development.js:23189
+    commitPassiveMountOnFiber @ react-dom.development.js:24965
+    commitPassiveMountEffects_complete @ react-dom.development.js:24930
+    commitPassiveMountEffects_begin @ react-dom.development.js:24917
+    commitPassiveMountEffects @ react-dom.development.js:24905
+    flushPassiveEffectsImpl @ react-dom.development.js:27078
+    flushPassiveEffects @ react-dom.development.js:27023
+    performSyncWorkOnRoot @ react-dom.development.js:26115
+    flushSyncCallbacks @ react-dom.development.js:12042
+    commitRootImpl @ react-dom.development.js:26998
+    commitRoot @ react-dom.development.js:26721
+    finishConcurrentRender @ react-dom.development.js:26020
+    performConcurrentWorkOnRoot @ react-dom.development.js:25848
+    workLoop @ scheduler.development.js:266
+    flushWork @ scheduler.development.js:239
+    performWorkUntilDeadline @ scheduler.development.js:533
+    __federation_expose_JobManager.js:158  Error loading runtimeconfig options: TypeError: Cannot read properties of undefined (reading 'map')
+        at loadConfigOptions (__federation_expose_JobManager.js:153:47)
+    loadConfigOptions @ __federation_expose_JobManager.js:158
+    await in loadConfigOptions
+    (anonymous) @ __federation_expose_JobManager.js:164
+    commitHookEffectListMount @ react-dom.development.js:23189
+    invokePassiveEffectMountInDEV @ react-dom.development.js:25193
+    invokeEffectsInDev @ react-dom.development.js:27390
+    commitDoubleInvokeEffectsInDEV @ react-dom.development.js:27369
+    flushPassiveEffectsImpl @ react-dom.development.js:27095
+    flushPassiveEffects @ react-dom.development.js:27023
+    performSyncWorkOnRoot @ react-dom.development.js:26115
+    flushSyncCallbacks @ react-dom.development.js:12042
+    commitRootImpl @ react-dom.development.js:26998
+    commitRoot @ react-dom.development.js:26721
+    finishConcurrentRender @ react-dom.development.js:26020
+    performConcurrentWorkOnRoot @ react-dom.development.js:25848
+    workLoop @ scheduler.development.js:266
+    flushWork @ scheduler.development.js:239
+    performWorkUntilDeadline @ scheduler.development.js:533
+    apiService.js:20 
+                
+                
+                GET http://localhost:8000/api/v1/configs/workflow 404 (Not Found)
+    dispatchXhrRequest @ xhr.js:195
+    xhr @ xhr.js:15
+    dispatchRequest @ dispatchRequest.js:51
+    _request @ Axios.js:187
+    request @ Axios.js:40
+    Axios.<computed> @ Axios.js:213
+    wrap @ bind.js:5
+    get @ apiService.js:20
+    loadConfigOptions @ __federation_expose_JobManager.js:152
+    await in loadConfigOptions
+    (anonymous) @ __federation_expose_JobManager.js:164
+    commitHookEffectListMount @ react-dom.development.js:23189
+    commitPassiveMountOnFiber @ react-dom.development.js:24965
+    commitPassiveMountEffects_complete @ react-dom.development.js:24930
+    commitPassiveMountEffects_begin @ react-dom.development.js:24917
+    commitPassiveMountEffects @ react-dom.development.js:24905
+    flushPassiveEffectsImpl @ react-dom.development.js:27078
+    flushPassiveEffects @ react-dom.development.js:27023
+    performSyncWorkOnRoot @ react-dom.development.js:26115
+    flushSyncCallbacks @ react-dom.development.js:12042
+    commitRootImpl @ react-dom.development.js:26998
+    commitRoot @ react-dom.development.js:26721
+    finishConcurrentRender @ react-dom.development.js:26020
+    performConcurrentWorkOnRoot @ react-dom.development.js:25848
+    workLoop @ scheduler.development.js:266
+    flushWork @ scheduler.development.js:239
+    performWorkUntilDeadline @ scheduler.development.js:533
+    apiService.js:15  API Error: {detail: 'Configuration type workflow not found'}
+    (anonymous) @ apiService.js:15
+    Promise.then
+    _request @ Axios.js:196
+    request @ Axios.js:40
+    Axios.<computed> @ Axios.js:213
+    wrap @ bind.js:5
+    get @ apiService.js:20
+    loadConfigOptions @ __federation_expose_JobManager.js:152
+    await in loadConfigOptions
+    (anonymous) @ __federation_expose_JobManager.js:164
+    commitHookEffectListMount @ react-dom.development.js:23189
+    commitPassiveMountOnFiber @ react-dom.development.js:24965
+    commitPassiveMountEffects_complete @ react-dom.development.js:24930
+    commitPassiveMountEffects_begin @ react-dom.development.js:24917
+    commitPassiveMountEffects @ react-dom.development.js:24905
+    flushPassiveEffectsImpl @ react-dom.development.js:27078
+    flushPassiveEffects @ react-dom.development.js:27023
+    performSyncWorkOnRoot @ react-dom.development.js:26115
+    flushSyncCallbacks @ react-dom.development.js:12042
+    commitRootImpl @ react-dom.development.js:26998
+    commitRoot @ react-dom.development.js:26721
+    finishConcurrentRender @ react-dom.development.js:26020
+    performConcurrentWorkOnRoot @ react-dom.development.js:25848
+    workLoop @ scheduler.development.js:266
+    flushWork @ scheduler.development.js:239
+    performWorkUntilDeadline @ scheduler.development.js:533
+    __federation_expose_JobManager.js:158  Error loading workflow options: AxiosError {message: 'Request failed with status code 404', name: 'AxiosError', code: 'ERR_BAD_REQUEST', config: {…}, request: XMLHttpRequest, …}
+    loadConfigOptions @ __federation_expose_JobManager.js:158
+    await in loadConfigOptions
+    (anonymous) @ __federation_expose_JobManager.js:164
+    commitHookEffectListMount @ react-dom.development.js:23189
+    commitPassiveMountOnFiber @ react-dom.development.js:24965
+    commitPassiveMountEffects_complete @ react-dom.development.js:24930
+    commitPassiveMountEffects_begin @ react-dom.development.js:24917
+    commitPassiveMountEffects @ react-dom.development.js:24905
+    flushPassiveEffectsImpl @ react-dom.development.js:27078
+    flushPassiveEffects @ react-dom.development.js:27023
+    performSyncWorkOnRoot @ react-dom.development.js:26115
+    flushSyncCallbacks @ react-dom.development.js:12042
+    commitRootImpl @ react-dom.development.js:26998
+    commitRoot @ react-dom.development.js:26721
+    finishConcurrentRender @ react-dom.development.js:26020
+    performConcurrentWorkOnRoot @ react-dom.development.js:25848
+    workLoop @ scheduler.development.js:266
+    flushWork @ scheduler.development.js:239
+    performWorkUntilDeadline @ scheduler.development.js:533
+    apiService.js:20 
+                
+                
+                GET http://localhost:8000/api/v1/configs/workflow 404 (Not Found)
+    dispatchXhrRequest @ xhr.js:195
+    xhr @ xhr.js:15
+    dispatchRequest @ dispatchRequest.js:51
+    _request @ Axios.js:187
+    request @ Axios.js:40
+    Axios.<computed> @ Axios.js:213
+    wrap @ bind.js:5
+    get @ apiService.js:20
+    loadConfigOptions @ __federation_expose_JobManager.js:152
+    await in loadConfigOptions
+    (anonymous) @ __federation_expose_JobManager.js:164
+    commitHookEffectListMount @ react-dom.development.js:23189
+    invokePassiveEffectMountInDEV @ react-dom.development.js:25193
+    invokeEffectsInDev @ react-dom.development.js:27390
+    commitDoubleInvokeEffectsInDEV @ react-dom.development.js:27369
+    flushPassiveEffectsImpl @ react-dom.development.js:27095
+    flushPassiveEffects @ react-dom.development.js:27023
+    performSyncWorkOnRoot @ react-dom.development.js:26115
+    flushSyncCallbacks @ react-dom.development.js:12042
+    commitRootImpl @ react-dom.development.js:26998
+    commitRoot @ react-dom.development.js:26721
+    finishConcurrentRender @ react-dom.development.js:26020
+    performConcurrentWorkOnRoot @ react-dom.development.js:25848
+    workLoop @ scheduler.development.js:266
+    flushWork @ scheduler.development.js:239
+    performWorkUntilDeadline @ scheduler.development.js:533
+    apiService.js:15  API Error: {detail: 'Configuration type workflow not found'}
+    (anonymous) @ apiService.js:15
+    Promise.then
+    _request @ Axios.js:196
+    request @ Axios.js:40
+    Axios.<computed> @ Axios.js:213
+    wrap @ bind.js:5
+    get @ apiService.js:20
+    loadConfigOptions @ __federation_expose_JobManager.js:152
+    await in loadConfigOptions
+    (anonymous) @ __federation_expose_JobManager.js:164
+    commitHookEffectListMount @ react-dom.development.js:23189
+    invokePassiveEffectMountInDEV @ react-dom.development.js:25193
+    invokeEffectsInDev @ react-dom.development.js:27390
+    commitDoubleInvokeEffectsInDEV @ react-dom.development.js:27369
+    flushPassiveEffectsImpl @ react-dom.development.js:27095
+    flushPassiveEffects @ react-dom.development.js:27023
+    performSyncWorkOnRoot @ react-dom.development.js:26115
+    flushSyncCallbacks @ react-dom.development.js:12042
+    commitRootImpl @ react-dom.development.js:26998
+    commitRoot @ react-dom.development.js:26721
+    finishConcurrentRender @ react-dom.development.js:26020
+    performConcurrentWorkOnRoot @ react-dom.development.js:25848
+    workLoop @ scheduler.development.js:266
+    flushWork @ scheduler.development.js:239
+    performWorkUntilDeadline @ scheduler.development.js:533
+    __federation_expose_JobManager.js:158  Error loading workflow options: AxiosError {message: 'Request failed with status code 404', name: 'AxiosError', code: 'ERR_BAD_REQUEST', config: {…}, request: XMLHttpRequest, …}
+    loadConfigOptions @ __federation_expose_JobManager.js:158
+    await in loadConfigOptions
+    (anonymous) @ __federation_expose_JobManager.js:164
+    commitHookEffectListMount @ react-dom.development.js:23189
+    invokePassiveEffectMountInDEV @ react-dom.development.js:25193
+    invokeEffectsInDev @ react-dom.development.js:27390
+    commitDoubleInvokeEffectsInDEV @ react-dom.development.js:27369
+    flushPassiveEffectsImpl @ react-dom.development.js:27095
+    flushPassiveEffects @ react-dom.development.js:27023
+    performSyncWorkOnRoot @ react-dom.development.js:26115
+    flushSyncCallbacks @ react-dom.development.js:12042
+    commitRootImpl @ react-dom.development.js:26998
+    commitRoot @ react-dom.development.js:26721
+    finishConcurrentRender @ react-dom.development.js:26020
+    performConcurrentWorkOnRoot @ react-dom.development.js:25848
+    workLoop @ scheduler.development.js:266
+    flushWork @ scheduler.development.js:239
+    performWorkUntilDeadline @ scheduler.development.js:533
+
+# LLM configuration
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      tartxt_config:
+        input_paths:
+          - "/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell"
+          - "/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared"
+          - "/Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management"
+          - "/Users/jim/src/apps/c4h_editor/backend/c4h_config_api.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Typescript_Design_Principles.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/workarea/c4h_editor_generic_config_01.md"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+          - "**/__pycache__/**"
+          - "**/*.pyc"
+          - "**/package-lock.json"
+          - "**/dist/**"
+          - "**/.DS_Store"
+          - "**/README.md"
+          - "**/workspaces/**"
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: false
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: false
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+  truncate:
+    prefix_length: 100
+    suffix_length: 100

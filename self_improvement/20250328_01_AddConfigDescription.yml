@@ -1,0 +1,117 @@
+# C4H Editor - Save & Load Config Description
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor/"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    GOAL: Fix the Config Description field save & load functionality
+
+    CONTEXT: Read the editor generic config, config service API & TypeScript design principles for context.
+    
+    APPROACH:
+    1. Trace the complete data flow for description fields from UI → API → Backend → Storage → API → UI
+    2. Identify ALL potential failure points across the entire stack
+    3. Fix EACH component ensuring correct handling of the description field
+    4. Document your complete investigation and solution
+    
+    DELIVERABLES:
+    1. ALL modified files in the correct format
+    1a. The description field is editable and saved with the config, not just at creation
+    1b. The description field is listed in the Config Browser
+    1c. The description field is editable in the Config Editor
+    2. A comprehensive ChangeLog_<datetime>.md in the root folder documenting:
+       - Problem description and impact
+       - Full analysis of the code flow
+       - All files examined and their role in the issue
+       - Detailed explanation of each change made
+       - Testing procedure to verify the fix
+    
+    PROBLEM:
+    When creating a Config, the Config Editor screen allows me to enter a description.
+    When I go back to edit the Config, I cannot see the description field.
+    When I look at the Config Browser, the description field shows "No Description".
+    Which leads me to believe the description may not be getting saved or loaded correctly.
+
+    Examine the ENTIRE workflow including server response. Don't focus only on a single file.
+    Assume the backend might be working correctly - validate with the provided logs.
+
+    From the Backend server logs:
+
+    From the Backe server logs:
+      {"timestamp": "2025-03-27 13:09:01", "level": "INFO", "name": "api.requests", "message": "API Request: {\"correlation_id\": \"68f60b82-751b-4134-bc57-31461bcbc172\", \"request\": {\"method\": \"POST\", \"url\": \"http://localhost:8000/api/v1/configs/workorder\", \"client_ip\": \"127.0.0.1\", \"headers\": {\"host\": \"localhost:8000\", \"connection\": \"keep-alive\", \"content-length\": \"400\", \"sec-ch-ua-platform\": \"\\\"macOS\\\"\", \"user-agent\": \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0\", \"accept\": \"application/json, text/plain, */*\", \"sec-ch-ua\": \"\\\"Chromium\\\";v=\\\"134\\\", \\\"Not:A-Brand\\\";v=\\\"24\\\", \\\"Microsoft Edge\\\";v=\\\"134\\\"\", \"content-type\": \"application/json\", \"dnt\": \"1\", \"sec-ch-ua-mobile\": \"?0\", \"origin\": \"http://localhost:3000\", \"sec-fetch-site\": \"same-site\", \"sec-fetch-mode\": \"cors\", \"sec-fetch-dest\": \"empty\", \"referer\": \"http://localhost:3000/\", \"accept-encoding\": \"gzip, deflate, br, zstd\", \"accept-language\": \"en-US,en;q=0.9,en-AU;q=0.8\"}, \"timestamp\": \"2025-03-27 13:09:01\", \"query_params\": {}}}"}
+      2025-03-27 13:09:01,082 - api.requests - INFO - API Request: {"correlation_id": "68f60b82-751b-4134-bc57-31461bcbc172", "request": {"method": "POST", "url": "http://localhost:8000/api/v1/configs/workorder", "client_ip": "127.0.0.1", "headers": {"host": "localhost:8000", "connection": "keep-alive", "content-length": "400", "sec-ch-ua-platform": "\"macOS\"", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0", "accept": "application/json, text/plain, */*", "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Microsoft Edge\";v=\"134\"", "content-type": "application/json", "dnt": "1", "sec-ch-ua-mobile": "?0", "origin": "http://localhost:3000", "sec-fetch-site": "same-site", "sec-fetch-mode": "cors", "sec-fetch-dest": "empty", "referer": "http://localhost:3000/", "accept-encoding": "gzip, deflate, br, zstd", "accept-language": "en-US,en;q=0.9,en-AU;q=0.8"}, "timestamp": "2025-03-27 13:09:01", "query_params": {}}}
+      2025-03-27 13:09:01,084 - backend.services.config_repository - INFO - Existing git repository loaded from /Users/jim/src/apps/c4h_editor/repositories/workorders
+      2025-03-27 13:09:01,084 - backend.services.config_repository - INFO - workorder repository initialized at /Users/jim/src/apps/c4h_editor/repositories/workorders
+      2025-03-27 13:09:01,084 - backend.services.config_repository - INFO - Writing workorder to file: /Users/jim/src/apps/c4h_editor/repositories/workorders/1002.json
+      2025-03-27 13:09:01,085 - backend.services.config_repository - INFO - File written successfully: /Users/jim/src/apps/c4h_editor/repositories/workorders/1002.json
+      2025-03-27 13:09:01,085 - backend.services.config_repository - INFO - Using relative path for git add: 1002.json
+      2025-03-27 13:09:01,116 - backend.services.config_repository - INFO - Workorder '1002' created with commit [main 876781d] Initial creation of workorder 1002
+      Author: Current User <Current User@example.com>
+      1 file changed, 26 insertions(+)
+      create mode 100644 1002.json
+      2025-03-27 13:09:01,116 - backend.services.config_repository - INFO - Workorder '1002' retrieved, version: latest
+      {"timestamp": "2025-03-27 13:09:01", "level": "INFO", "name": "api.requests", "message": "API Response: {\"correlation_id\": \"68f60b82-751b-4134-bc57-31461bcbc172\", \"response\": {\"status_code\": 200, \"duration_ms\": 35.05, \"timestamp\": \"2025-03-27 13:09:01\"}}"}
+      2025-03-27 13:09:01,117 - api.requests - INFO - API Response: {"correlation_id": "68f60b82-751b-4134-bc57-31461bcbc172", "response": {"status_code": 200, "duration_ms": 35.05, "timestamp": "2025-03-27 13:09:01"}}
+      INFO:     127.0.0.1:53080 - "POST /api/v1/configs/workorder HTTP/1.1" 200 OK
+      {"timestamp": "2025-03-27 13:09:01", "level": "INFO", "name": "api.requests", "message": "API Request: {\"correlation_id\": \"674c3c63-e0ad-4fff-97df-9f130557a6f2\", \"request\": {\"method\": \"GET\", \"url\": \"http://localhost:8000/api/v1/configs/workorder\", \"client_ip\": \"127.0.0.1\", \"headers\": {\"host\": \"localhost:8000\", \"connection\": \"keep-alive\", \"sec-ch-ua-platform\": \"\\\"macOS\\\"\", \"user-agent\": \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0\", \"accept\": \"application/json, text/plain, */*\", \"sec-ch-ua\": \"\\\"Chromium\\\";v=\\\"134\\\", \\\"Not:A-Brand\\\";v=\\\"24\\\", \\\"Microsoft Edge\\\";v=\\\"134\\\"\", \"dnt\": \"1\", \"sec-ch-ua-mobile\": \"?0\", \"origin\": \"http://localhost:3000\", \"sec-fetch-site\": \"same-site\", \"sec-fetch-mode\": \"cors\", \"sec-fetch-dest\": \"empty\", \"referer\": \"http://localhost:3000/\", \"accept-encoding\": \"gzip, deflate, br, zstd\", \"accept-language\": \"en-US,en;q=0.9,en-AU;q=0.8\"}, \"timestamp\": \"2025-03-27 13:09:01\", \"query_params\": {}}}"}
+      2025-03-27 13:09:01,119 - api.requests - INFO - API Request: {"correlation_id": "674c3c63-e0ad-4fff-97df-9f130557a6f2", "request": {"method": "GET", "url": "http://localhost:8000/api/v1/configs/workorder", "client_ip": "127.0.0.1", "headers": {"host": "localhost:8000", "connection": "keep-alive", "sec-ch-ua-platform": "\"macOS\"", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0", "accept": "application/json, text/plain, */*", "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Microsoft Edge\";v=\"134\"", "dnt": "1", "sec-ch-ua-mobile": "?0", "origin": "http://localhost:3000", "sec-fetch-site": "same-site", "sec-fetch-mode": "cors", "sec-fetch-dest": "empty", "referer": "http://localhost:3000/", "accept-encoding": "gzip, deflate, br, zstd", "accept-language": "en-US,en;q=0.9,en-AU;q=0.8"}, "timestamp": "2025-03-27 13:09:01", "query_params": {}}}
+      2025-03-27 13:09:01,120 - backend.services.config_repository - INFO - Existing git repository loaded from /Users/jim/src/apps/c4h_editor/repositories/workorders
+      2025-03-27 13:09:01,120 - backend.services.config_repository - INFO - workorder repository initialized at /Users/jim/src/apps/c4h_editor/repositories/workorders
+      2025-03-27 13:09:01,216 - backend.services.config_repository - INFO - Listed 6 workorder configurations
+      {"timestamp": "2025-03-27 13:09:01", "level": "INFO", "name": "api.requests", "message": "API Response: {\"correlation_id\": \"674c3c63-e0ad-4fff-97df-9f130557a6f2\", \"response\": {\"status_code\": 200, \"duration_ms\": 98.03, \"timestamp\": \"2025-03-27 13:09:01\"}}"}
+      2025-03-27 13:09:01,217 - api.requests - INFO - API Response: {"correlation_id": "674c3c63-e0ad-4fff-97df-9f130557a6f2", "response": {"status_code": 200, "duration_ms": 98.03, "timestamp": "2025-03-27 13:09:01"}}
+      INFO:     127.0.0.1:53080 - "GET /api/v1/configs/workorder HTTP/1.1" 200 OK
+
+      
+
+# LLM configuration
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      tartxt_config:
+        input_paths:
+          - "/Users/jim/src/apps/c4h_editor/c4h-micro/packages"
+          - "/Users/jim/src/apps/c4h_editor/backend/c4h_config_api.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Typescript_Design_Principles.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/workarea/c4h_editor_generic_config_01.md"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+          - "**/__pycache__/**"
+          - "**/*.pyc"
+          - "**/package-lock.json"
+          - "**/dist/**"
+          - "**/.DS_Store"
+          - "**/README.md"
+          - "**/workspaces/**"
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: false
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: false
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+  truncate:
+    prefix_length: 100
+    suffix_length: 100

@@ -1,0 +1,144 @@
+# C4H Editor - Frontend fix Job Management
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_editor/"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    read the editor generic config, config api & typescript 
+    design principles for context
+    we are refactoring job management ui to comply to api i want to fix 
+    the following browser errors.
+
+    I need to be able to create a Job, each of the drop downs a list the 
+    work orders, team configs, runtime configs.
+
+    When i click "Submit Job" I get the following errors
+
+    Determine root cause and fix the browser errors
+    Add error handling to gracefully handle the errors if services are not available
+
+    The current brwonser errors are:
+                    POST http://localhost:8000/api/v1/jobs 422 (Unprocessable Entity)
+        dispatchXhrRequest @ xhr.js:195
+        xhr @ xhr.js:15
+        dispatchRequest @ dispatchRequest.js:51
+        _request @ Axios.js:187
+        request @ Axios.js:40
+        httpMethod @ Axios.js:226
+        wrap @ bind.js:5
+        post @ apiService.js:24
+        (anonymous) @ __federation_expose_JobManager.js:82
+        handleSubmit @ __federation_expose_JobManager.js:182
+        callCallback2 @ react-dom.development.js:4164
+        invokeGuardedCallbackDev @ react-dom.development.js:4213
+        invokeGuardedCallback @ react-dom.development.js:4277
+        invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4291
+        executeDispatch @ react-dom.development.js:9041
+        processDispatchQueueItemsInOrder @ react-dom.development.js:9073
+        processDispatchQueue @ react-dom.development.js:9086
+        dispatchEventsForPlugins @ react-dom.development.js:9097
+        (anonymous) @ react-dom.development.js:9288
+        batchedUpdates$1 @ react-dom.development.js:26179
+        batchedUpdates @ react-dom.development.js:3991
+        dispatchEventForPluginEventSystem @ react-dom.development.js:9287
+        dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6465
+        dispatchEvent @ react-dom.development.js:6457
+        dispatchDiscreteEvent @ react-dom.development.js:6430
+        apiService.js:15  API Error: {detail: Array(3)}detail: (3) [{…}, {…}, {…}][[Prototype]]: Object
+        (anonymous) @ apiService.js:15
+        Promise.then
+        _request @ Axios.js:196
+        request @ Axios.js:40
+        httpMethod @ Axios.js:226
+        wrap @ bind.js:5
+        post @ apiService.js:24
+        (anonymous) @ __federation_expose_JobManager.js:82
+        handleSubmit @ __federation_expose_JobManager.js:182
+        callCallback2 @ react-dom.development.js:4164
+        invokeGuardedCallbackDev @ react-dom.development.js:4213
+        invokeGuardedCallback @ react-dom.development.js:4277
+        invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4291
+        executeDispatch @ react-dom.development.js:9041
+        processDispatchQueueItemsInOrder @ react-dom.development.js:9073
+        processDispatchQueue @ react-dom.development.js:9086
+        dispatchEventsForPlugins @ react-dom.development.js:9097
+        (anonymous) @ react-dom.development.js:9288
+        batchedUpdates$1 @ react-dom.development.js:26179
+        batchedUpdates @ react-dom.development.js:3991
+        dispatchEventForPluginEventSystem @ react-dom.development.js:9287
+        dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6465
+        dispatchEvent @ react-dom.development.js:6457
+        dispatchDiscreteEvent @ react-dom.development.js:6430
+        __federation_expose_JobManager.js:86  Error submitting job: AxiosError {message: 'Request failed with status code 422', name: 'AxiosError', code: 'ERR_BAD_REQUEST', config: {…}, request: XMLHttpRequest, …}code: "ERR_BAD_REQUEST"config: {transitional: {…}, adapter: Array(3), transformRequest: Array(1), transformResponse: Array(1), timeout: 30000, …}message: "Request failed with status code 422"name: "AxiosError"request: XMLHttpRequest {onreadystatechange: null, readyState: 4, timeout: 30000, withCredentials: false, upload: XMLHttpRequestUpload, …}response: {data: {…}, status: 422, statusText: 'Unprocessable Entity', headers: AxiosHeaders, config: {…}, …}status: 422stack: "AxiosError: Request failed with status code 422\n    at settle (http://localhost:3000/node_modules/.vite/deps/axios.js?v=cef93271:1218:12)\n    at XMLHttpRequest.onloadend (http://localhost:3000/node_modules/.vite/deps/axios.js?v=cef93271:1550:7)\n    at Axios.request (http://localhost:3000/node_modules/.vite/deps/axios.js?v=cef93271:2108:41)\n    at async ApiService.post (http://localhost:3000/@fs/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared/dist/services/apiService.js:24:26)\n    at async http://localhost:3004/__federation_expose_JobManager.js:82:7"[[Prototype]]: Error
+        (anonymous) @ __federation_expose_JobManager.js:86
+        await in (anonymous)
+        handleSubmit @ __federation_expose_JobManager.js:182
+        callCallback2 @ react-dom.development.js:4164
+        invokeGuardedCallbackDev @ react-dom.development.js:4213
+        invokeGuardedCallback @ react-dom.development.js:4277
+        invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4291
+        executeDispatch @ react-dom.development.js:9041
+        processDispatchQueueItemsInOrder @ react-dom.development.js:9073
+        processDispatchQueue @ react-dom.development.js:9086
+        dispatchEventsForPlugins @ react-dom.development.js:9097
+        (anonymous) @ react-dom.development.js:9288
+        batchedUpdates$1 @ react-dom.development.js:26179
+        batchedUpdates @ react-dom.development.js:3991
+        dispatchEventForPluginEventSystem @ react-dom.development.js:9287
+        dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6465
+        dispatchEvent @ react-dom.development.js:6457
+        dispatchDiscreteEvent @ react-dom.development.js:6430
+
+# LLM configuration
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      tartxt_config:
+        input_paths:
+          - "/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell"
+          - "/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared"
+          - "/Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management"
+          - "/Users/jim/src/apps/c4h_editor/backend/c4h_config_api.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Typescript_Design_Principles.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/workarea/c4h_editor_generic_config_01.md"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+          - "**/__pycache__/**"
+          - "**/*.pyc"
+          - "**/package-lock.json"
+          - "**/dist/**"
+          - "**/.DS_Store"
+          - "**/README.md"
+          - "**/workspaces/**"
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: false
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: false
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+  truncate:
+    prefix_length: 100
+    suffix_length: 100
