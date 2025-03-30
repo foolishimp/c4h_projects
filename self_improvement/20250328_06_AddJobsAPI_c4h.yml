@@ -1,0 +1,368 @@
+# C4H Editor - Save & Load Config Description
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    GOAL: Implement the new C4H Jobs API (Phase 1) as a proxy layer over the existing Workflow API.
+
+    CONTEXT:
+    The current C4H Workflow API has a flat configuration structure that doesn't align with how users conceptualize refactoring jobs. 
+    We need to restructure the API interface into logical groups (Workorder, Team, Runtime) while maintaining compatibility with the 
+    existing system.
+
+    The Jobs API will initially serve as a translation layer that maps between the new structured format and the existing Workflow API format. 
+    No changes to the core processing should be made in this phase.
+
+    APPROACH:
+    1. Create new API endpoints according to the OpenAPI specification
+    2. Implement bidirectional configuration mapping between Jobs and Workflow formats
+    3. Create job-to-workflow ID mapping and persistence mechanism
+    4. Ensure complete preservation of all configuration values during translation
+    5. Implement proper error handling, validation, and logging
+
+    DELIVERABLES:
+    1. Implementation of the `/api/v1/jobs` POST endpoint
+    2. Implementation of the `/api/v1/jobs/{jobId}` GET endpoint
+    3. Configuration mapper for transforming between formats
+    4. Job-to-workflow ID mapping persistence
+    5. Comprehensive test cases demonstrating equivalence
+    6. Documentation for the new API
+    7. A ChangeLog.md entry documenting the implementation
+
+    CONSTRAINTS:
+    - Must be fully compatible with the existing Workflow API
+    - No changes to the core processing system
+    - Must maintain all existing functionality
+    - Must preserve all configuration values during translation
+    - The Jobs API should run alongside the existing Workflow API
+
+    OPENAPI SPECIFICATION:
+    ```yaml
+    openapi: 3.1.0
+    info:
+      title: C4H LLM API
+      description: API for submitting code refactoring jobs with structured configuration
+      version: 1.0.0
+
+    paths:
+      /api/v1/jobs:
+        post:
+          summary: Submit a new code refactoring job
+          description: Submit a job with workorder, team, and runtime configurations
+          operationId: submitJob
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/JobRequest'
+          responses:
+            '200':
+              description: Job submitted successfully
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/JobResponse'
+            '400':
+              description: Invalid request payload
+            '500':
+              description: Server error
+      
+      /api/v1/jobs/{jobId}:
+        get:
+          summary: Get job status
+          description: Retrieve the status and results of a submitted job
+          operationId: getJobStatus
+          parameters:
+            - name: jobId
+              in: path
+              required: true
+              schema:
+                type: string
+          responses:
+            '200':
+              description: Job status retrieved
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/JobStatus'
+            '404':
+              description: Job not found
+
+    components:
+      schemas:
+        JobRequest:
+          type: object
+          required:
+            - workorder
+          properties:
+            workorder:
+              type: object
+              required:
+                - project
+                - intent
+              properties:
+                project:
+                  type: object
+                  required:
+                    - path
+                  properties:
+                    path:
+                      type: string
+                      description: Path to the project directory
+                    workspace_root:
+                      type: string
+                      description: Directory for working files
+                    source_root:
+                      type: string
+                      description: Base directory for source code
+                    output_root:
+                      type: string
+                      description: Base directory for output files
+                intent:
+                  type: object
+                  required:
+                    - description
+                  properties:
+                    description:
+                      type: string
+                      description: Description of the refactoring intent
+                    target_files:
+                      type: array
+                      items:
+                        type: string
+                      description: Optional list of specific files to target
+            team:
+              type: object
+              properties:
+                llm_config:
+                  type: object
+                  properties:
+                    default_provider:
+                      type: string
+                      enum: [anthropic, openai, gemini]
+                    default_model:
+                      type: string
+                    providers:
+                      type: object
+                      additionalProperties: true
+                    agents:
+                      type: object
+                      additionalProperties: true
+                orchestration:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                    entry_team:
+                      type: string
+                      default: discovery
+                    teams:
+                      type: object
+                      additionalProperties: true
+            runtime:
+              type: object
+              properties:
+                runtime:
+                  type: object
+                  properties:
+                    workflow:
+                      type: object
+                      properties:
+                        storage:
+                          type: object
+                          additionalProperties: true
+                    lineage:
+                      type: object
+                      additionalProperties: true
+                logging:
+                  type: object
+                  properties:
+                    level:
+                      type: string
+                      enum: [DEBUG, INFO, WARNING, ERROR]
+                    format:
+                      type: string
+                      enum: [structured, plain]
+                    agent_level:
+                      type: string
+                      enum: [DEBUG, INFO, WARNING, ERROR]
+                backup:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    path:
+                      type: string
+
+        JobResponse:
+          type: object
+          required:
+            - job_id
+            - status
+          properties:
+            job_id:
+              type: string
+              description: Unique identifier for the job
+            status:
+              type: string
+              enum: [pending, running, success, error]
+            storage_path:
+              type: string
+              description: Path where job results are stored
+            error:
+              type: string
+              nullable: true
+              description: Error message if status is error
+
+        JobStatus:
+          type: object
+          required:
+            - job_id
+            - status
+          properties:
+            job_id:
+              type: string
+            status:
+              type: string
+              enum: [pending, running, success, error]
+            storage_path:
+              type: string
+            error:
+              type: string
+              nullable: true
+            changes:
+              type: array
+              items:
+                type: object
+                properties:
+                  file:
+                    type: string
+                  success:
+                    type: boolean
+                  error:
+                    type: string
+                    nullable: true
+                  backup:
+                    type: string
+                    nullable: true
+    ```
+
+    CONFIG TRANSFORMATION:
+    The key functionality is transforming between these formats:
+
+    FROM JOBS API FORMAT:
+    ```json
+    {
+      "workorder": {
+        "project": { "path": "/path/to/project" },
+        "intent": { "description": "Add logging" }
+      },
+      "team": {
+        "llm_config": { ... },
+        "orchestration": { ... }
+      },
+      "runtime": {
+        "runtime": { ... },
+        "logging": { ... },
+        "backup": { ... }
+      }
+    }
+    ```
+
+    TO WORKFLOW API FORMAT:
+    ```json
+    {
+      "project_path": "/path/to/project",
+      "intent": { "description": "Add logging" },
+      "app_config": {
+        "project": { ... },
+        "llm_config": { ... },
+        "orchestration": { ... },
+        "runtime": { ... },
+        "logging": { ... },
+        "backup": { ... }
+      }
+    }
+    ```
+
+    And vice versa when converting workflow responses to job responses.
+
+    Please ensure the implementation adheres to the existing C4H design principles, particularly the Configuration Design Principles and TypeScript Design Principles for any frontend components.
+
+# LLM configuration
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      tartxt_config:
+        input_paths:
+          - "c4h_services"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Agent_Design_Principles_v2.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Config_Design_Principles.md"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+          - "**/__pycache__/**"
+          - "**/*.pyc"
+          - "**/package-lock.json"
+          - "**/dist/**"
+          - "**/.DS_Store"
+          - "**/README.md"
+          - "**/workspaces/**"
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219" 
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    coder:
+      provider: "openai"
+      model: "o3-mini"
+      temperature: 0
+      backup_enabled: true
+    semantic_fast_extractor:
+      provider: "openai"
+      model: "o3-mini"
+      temperature: 0
+    semantic_slow_extractor:
+      provider: "openai"
+      model: "o3-mini"
+      temperature: 0
+    semantic_merge:
+      provider: "openai"
+      model: "o3-mini"
+      temperature: 0
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: false
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+  truncate:
+    prefix_length: 100
+    suffix_length: 100
