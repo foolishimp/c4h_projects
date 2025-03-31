@@ -102,13 +102,25 @@ python ./c4h_services/src/bootstrap/prefect_runner.py  workflow --config \
 /Users/jim/src/apps/c4h_projects/self_improvement/   \
 2>&1 | tee output.txt
 
+### Running from coder using a Soln Designer Input
 python ./c4h_services/src/bootstrap/prefect_runner.py  workflow --config \
 /Users/jim/src/apps/c4h_projects/self_improvement/20250328_06_AddJobsAPI_c4h.yml  \
 --stage coder \
 --lineage-file /Users/jim/src/apps/c4h/workspaces/lineage/20250330/wf_2350_11c00ca0-7c98-4a7a-be14-c8e6245e967a/events/44889ed0-90a4-4405-9aad-0cc779b6018c.json \
 2>&1 | tee output.txt
 
+### custom generated open lineage event
+python ./c4h_services/src/bootstrap/prefect_runner.py  workflow --config \
+/Users/jim/src/apps/c4h_projects/self_improvement/events/20250000_00_Generic.yml \
+--stage coder \
+--lineage-file /Users/jim/src/apps/c4h_projects/self_improvement/events/20250331_00_CleanupRunID.json \
+2>&1 | tee output.txt
 
 
+## Test case with load lineage
 
-
+python ./c4h_services/src/bootstrap/prefect_runner.py  workflow \
+--config tests/examples/config/0228_02_applylogging.yml \
+--stage coder \
+--lineage-file /Users/jim/src/apps/c4h/workspaces/lineage/20250331/wf_1531_58e009c7-2556-4596-89d9-d92560890c81/events/781778da-6773-4e21-9338-e3b08ac12ecc.json \
+2>&1 | tee output.txt

@@ -1,0 +1,86 @@
+# C4H Editor - Save & Load Config Description
+# Project settings
+project:
+  path: "/Users/jim/src/apps/c4h_ai_dev"
+  workspace_root: "workspaces"
+
+intent:
+  description: |
+    
+    Please ensure the implementation adheres to the existing
+     C4H design principles, particularly the 
+     Configuration Design Principles and TypeScript Design Principles 
+     for any frontend components.
+
+# LLM configuration
+llm_config:
+  default_provider: "anthropic"
+  default_model: "claude-3-7-sonnet-20250219"
+  agents:
+    discovery:
+      provider: "anthropic"
+      model: "claude-3-5-sonnet-20241022"
+      tartxt_config:
+        input_paths:
+          - "c4h_services"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Agent_Design_Principles_v2.md"
+          - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Config_Design_Principles.md"
+        exclusions:
+          - "**/node_modules/**"
+          - "**/.git/**"
+          - "**/__pycache__/**"
+          - "**/*.pyc"
+          - "**/package-lock.json"
+          - "**/dist/**"
+          - "**/.DS_Store"
+          - "**/README.md"
+          - "**/workspaces/**"
+    solution_designer:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219" 
+      temperature: 1
+      extended_thinking:
+        enabled: true
+        budget_tokens: 32000
+    coder:
+      provider: "openai"
+      model: "o3-mini"
+      temperature: 0
+      backup_enabled: true
+    semantic_fast_extractor:
+      provider: "openai"
+      model: "o3-mini"
+      temperature: 0
+    semantic_slow_extractor:
+      provider: "openai"
+      model: "o3-mini"
+      temperature: 0
+    semantic_merge:
+      provider: "openai"
+      model: "o3-mini"
+      temperature: 0
+
+# Runtime configuration
+runtime:
+  workflow:
+    storage:
+      enabled: true
+      root_dir: "workspaces/workflows"
+      format: "yymmdd_hhmm_{workflow_id}"
+    error_handling:
+      ignore_storage_errors: true
+      log_level: "ERROR"
+
+# Backup configuration
+backup:
+  enabled: false
+  path: "workspaces/backups"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  agent_level: "DEBUG"
+  truncate:
+    prefix_length: 100
+    suffix_length: 100
