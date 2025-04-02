@@ -1,0 +1,106 @@
+# C4H job configuration for removing configuration tech debt
+
+# Workorder section - contains project and intent details
+workorder:
+  project:
+    path: "/Users/jim/src/apps/c4h_ai_dev"
+    workspace_root: "workspaces"
+  
+  intent:
+    description: |
+      Refactor the runtime configuration system to remove technical debt and unused settings:
+      
+      1. Remove unused configuration paths:
+        - All of `runtime.workflow.storage.*` except for any settings actively referenced in code
+        - `runtime.lineage.retry.*` subsection entirely
+        - `runtime.lineage.context.*` if not functionally implemented
+      
+      2. Implement proper error handling:
+        - Update `base_lineage.py` to check for and respect `runtime.lineage.error_handling.ignore_failures`
+      
+      3. Normalize configuration access:
+        - Ensure consistent path access patterns across all components
+        - Document actually used settings in comments
+      
+      4. Update interface documentation:
+        - Update API documentation to reflect changes
+        - Add clear comments where settings were removed
+      
+      5. CRITICAL CONSTRAINTS:
+        - Do not break existing functionality
+        - Maintain backward compatibility for any public interfaces
+        - All existing code that uses a configuration value must continue to work
+        - If an interface changed, update all callers
+        - Preserve existing logging functionality
+        
+      The refactoring should focus on removing dead code and unused configuration options while ensuring the system continues to function correctly. Only remove config paths that are definitively unused in any code path.
+    
+      target_files:
+        - "c4h_agents/base_lineage.py"
+        - "c4h_services/src/orchestration/orchestrator.py"
+        - "c4h_services/src/bootstrap/prefect_runner.py"
+        - "c4h_services/src/api/service.py"
+        - "c4h_services/src/api/models.py"
+
+# Team section - contains LLM and orchestration settings
+team:
+  llm_config:
+    default_provider: "anthropic"
+    default_model: "claude-3-7-sonnet-20250219"
+    agents:
+      discovery:
+        temperature: 0
+        tartxt_config:
+          script_path: "./c4h_agents/skills/tartxt.py"
+          input_paths: ["./"]
+          exclusions: ["**/__pycache__/**"]
+      solution_designer:
+        provider: "anthropic"
+        model: "claude-3-7-sonnet-20250219"
+        temperature: 1
+        extended_thinking:
+          enabled: true
+          budget_tokens: 32000
+      coder:
+        provider: "anthropic"
+        model: "claude-3-opus-20240229"
+        temperature: 0
+
+# Runtime section - contains environment configuration
+runtime:
+  # Lineage tracking configuration  
+  lineage:
+    enabled: true
+    namespace: "c4h_workflow"
+    separate_input_output: true
+    backend:
+      type: "file"
+      path: "workspaces/lineage"
+    error_handling:
+      ignore_failures: true
+      log_level: "ERROR"
+    context:
+      include_metrics: true
+      include_token_usage: true
+      record_timestamps: true
+
+  # Backup settings  
+  backup:
+    enabled: true
+    path: "./workspaces/backups"
+
+  # Logging configuration
+  logging:
+    level: "INFO"
+    format: "structured"
+    agent_level: "DEBUG"
+    truncate:
+      prefix_length: 100
+      suffix_length: 100
+    providers:
+      anthropic:
+        level: "debug"
+      openai:
+        level: "debug"
+      gemini:
+        level: "debug"
