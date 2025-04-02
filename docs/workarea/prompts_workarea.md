@@ -1,3 +1,5 @@
+
+## Config Managment
 tartxt.py \
    /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell \
    /Users/jim/src/apps/c4h_editor/c4h-micro/packages/config-selector \
@@ -8,6 +10,8 @@ tartxt.py \
   -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**" \
   -f /Users/jim/src/apps/c4h_editor/backup_txt/c4h_editor_micro.txt
 
+
+## Job Management
 tartxt.py \
    /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell \
    /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared \
@@ -112,6 +116,10 @@ tartxt.py \
 ## Run as a service
  python ./c4h_services/src/bootstrap/prefect_runner.py  service -P 5500
 
+## workflow running directly is depricated - use client mode
+python ./c4h_services/src/bootstrap/prefect_runner.py  client -P 5500 \
+ --config /Users/jim/src/apps/c4h_projects/self_improvement/   2>&1 | tee output.txt
+
 
 ## workflow running directly is depricated - use client mode
 python ./c4h_services/src/bootstrap/prefect_runner.py  workflow --config \
@@ -201,6 +209,10 @@ python ./c4h_services/src/bootstrap/prefect_runner.py  jobs -P 5500 \
 2>&1 | tee output.txt
 
 
+python ./c4h_services/src/bootstrap/prefect_runner.py  job \
+--config  /Users/jim/src/apps/c4h_projects/self_improvement/20250402_02_MVP_JobSubmission_front.yml \
+--stage coder \
+--lineage-file 
 
   agents:
     base:  # Base settings all agents inherit

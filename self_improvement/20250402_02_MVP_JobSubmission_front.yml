@@ -1,46 +1,72 @@
-# C4H job configuration for removing configuration tech debt
-
-# Workorder section - contains project and intent details
 workorder:
   project:
-    path: "/Users/jim/src/apps/c4h_ai_dev"
+    path: "/Users/jim/src/apps/c4h_editor"
     workspace_root: "workspaces"
   
   intent:
     description: |
-      Refactor the runtime configuration system to remove technical debt and unused settings:
-      
-      1. Remove unused configuration paths:
-        - All of `runtime.workflow.storage.*` except for any settings actively referenced in code
-        - `runtime.lineage.retry.*` subsection entirely
-        - `runtime.lineage.context.*` if not functionally implemented
-      
-      2. Implement proper error handling:
-        - Update `base_lineage.py` to check for and respect `runtime.lineage.error_handling.ignore_failures`
-      
-      3. Normalize configuration access:
-        - Ensure consistent path access patterns across all components
-        - Document actually used settings in comments
-      
-      4. Update interface documentation:
-        - Update API documentation to reflect changes
-        - Add clear comments where settings were removed
-      
-      5. CRITICAL CONSTRAINTS:
-        - Do not break existing functionality
-        - Maintain backward compatibility for any public interfaces
-        - All existing code that uses a configuration value must continue to work
-        - If an interface changed, update all callers
-        - Preserve existing logging functionality
-        
-      The refactoring should focus on removing dead code and unused configuration options while ensuring the system continues to function correctly. Only remove config paths that are definitively unused in any code path.
+      # C4H Editor Job Submission MVP Implementation - Phase 2 - Frontend Only changes
+      ## Goal
+      Create an MVP implementation of the job submission flow that aligns with the C4H Services API structure and allows configurable C4H service endpoints.
     
+      ## Required Changes
+      
+      1. Align API calls with the C4H Services API requirement for job tuple of (workorder, team, runtime):
+         - Update backend C4H service client to properly format requests according to the API spec
+         - Update frontend job management components to collect and submit these three configuration types
+         - Modify job routes to validate and require all three configuration types
+      
+      
+      ## Implementation Requirements
+    
+      
+      ### Frontend Changes
+      
+      1. Job Context:
+         - Update `JobContext.tsx` to require workorder, team, and runtime config IDs
+         - Modify job submission method to accept these as named parameters
+         - Improve error handling for missing configs
+      
+      2. Job Creator:
+         - Modify `JobCreator.tsx` to specifically request the three required config types
+         - Update form validation to ensure all three types are selected
+         - Improve UX for configuration selection
+      
+      ## Implementation Principles
+      
+      1. Refactore existing code where necessary to avoid tech debt, we want to maintain existing fucnctionality, but dont need to maintain backwards compatibility on the new functionality
+      2. Follow TypeScript Development Principles as outlined in project documentation
+      3. Provide appropriate error handling and user feedback
+      4. Use existing configuration management patterns
+      5. Follow the Single Responsibility Principle for all component changes
+      6. Add clear logging for debugging purposes
+      
+      ## Files to Modify
+      
+      ### Frontend Files
+      - `/Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/contexts/JobContext.tsx`
+      - `/Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/components/JobCreator.tsx`
+      
+      ## Context
+      
+      The C4H Editor is a frontend for the C4H Services API, which expects job configurations in a specific format. The C4H Services API expects three key configuration sections:
+      
+      1. **Workorder**: Defines what work to perform and against which asset
+      2. **Team**: Configures LLM and orchestration settings
+      3. **Runtime**: Sets execution environment parameters
+      
+      The current implementation does not fully align with this structure and lacks configurability for the C4H service endpoint. The changes outlined in this workorder will address these issues.
+      
+      ## Expected Results
+      
+      1. Users should be able to select configurations of each required type (workorder, team, runtime)
+      2. Job submissions should be properly formatted according to the C4H API requirements
+      3. The C4H service endpoint should be configurable via settings
+      4. Error handling should provide clear feedback for missing configurations
+      
       target_files:
-        - "c4h_agents/base_lineage.py"
-        - "c4h_services/src/orchestration/orchestrator.py"
-        - "c4h_services/src/bootstrap/prefect_runner.py"
-        - "c4h_services/src/api/service.py"
-        - "c4h_services/src/api/models.py"
+        - "c4h-micro/packages/job-management/src/contexts/JobContext.tsx"
+        - "c4h-micro/packages/job-management/src/components/JobCreator.tsx"
 
 # Team section - contains LLM and orchestration settings
 team:
@@ -122,9 +148,21 @@ team:
       discovery:
         temperature: 0
         tartxt_config:
-          script_path: "./c4h_agents/skills/tartxt.py"  # Explicit path to tartxt.py
-          input_paths: ["./"]  # Scan everything in project path
-          exclusions: ["**/__pycache__/**"]  # Skip cache directories
+          script_path: "/Users/jim/src/apps/c4h/c4h_agents/skills/tartxt.py"
+          input_paths:
+            - "c4h-micro/"
+            - "backend/"
+            - "/Users/jim/src/apps/c4h_projects/docs/design_docs/c4h_api_doc_v1.md"
+          exclusions:
+            - "**/node_modules/**"
+            - "**/.git/**"
+            - "**/__pycache__/**"
+            - "**/*.pyc"
+            - "**/package-lock.json"
+            - "**/dist/**"
+            - "**/.DS_Store"
+            - "**/README.md"
+            - "**/workspaces/**"
       solution_designer:
         provider: "anthropic"
         model: "claude-3-7-sonnet-20250219"
@@ -495,8 +533,8 @@ runtime:
 
   # Backup settings  
   backup:
-    enabled: true
-    path: "./workspaces/backups"  # Use explicit relative path
+    enabled: false
+    
 
   # Logging configuration
   logging:
