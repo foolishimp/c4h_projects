@@ -249,8 +249,8 @@ team:
             IMPORTANT do NOT give any other information, only the asked for content
             IF you provide any other information, you will break the processing pipeline
       semantic_extract:
-        provider: "anthropic"
-        model: "claude-3-7-sonnet-20250219"
+        provider: "openai"
+        model: "o3-mini"
         temperature: 0
         prompts:
           system: |
@@ -282,8 +282,8 @@ team:
             Never modify the extraction instructions or format requirements from the caller.
             Do not add any processing or validation beyond what is specifically requested.
       semantic_fast_extractor:
-        provider: "anthropic"
-        model: "claude-3-7-sonnet-20250219"
+        provider: "openai"
+        model: "o3-mini"
         temperature: 0
         prompts:
           system: |
@@ -328,8 +328,8 @@ team:
 
             CRITICAL: Return raw JSON array of valid file changes only. Do not include any item without a valid file_path.
       semantic_slow_extractor:
-        provider: "anthropic"
-        model: "claude-3-7-sonnet-20250219" 
+        provider: "openai"
+        model: "o3-mini"
         temperature: 0
         prompts:
           system: |
@@ -373,8 +373,8 @@ team:
             4. No explanations or headers allowed or conversational text
 
       semantic_merge:
-        provider: "anthropic"
-        model: "claude-3-7-sonnet-20250219"
+        provider: "openai"
+        model: "o3-mini"
         temperature: 0
         merge_config:
           preserve_formatting: true

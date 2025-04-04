@@ -5,68 +5,64 @@ workorder:
   
   intent:
     description: |
-      # C4H Editor Job Submission MVP Implementation - Phase 2 - Frontend Only changes
-      ## Goal
-      Create an MVP implementation of the job submission flow that aligns with the C4H Services API structure and allows configurable C4H service endpoints.
-    
-      ## Required Changes
-      
-      1. Align API calls with the C4H Services API requirement for job tuple of (workorder, team, runtime):
-         - Update backend C4H service client to properly format requests according to the API spec
-         - Update frontend job management components to collect and submit these three configuration types
-         - Modify job routes to validate and require all three configuration types
-      
-      
-      ## Implementation Requirements
-    
-      
-      ### Frontend Changes
-      
-      1. Job Context:
-         - Update `JobContext.tsx` to require workorder, team, and runtime config IDs
-         - Modify job submission method to accept these as named parameters
-         - Improve error handling for missing configs
-      
-      2. Job Creator:
-         - Modify `JobCreator.tsx` to specifically request the three required config types
-         - Update form validation to ensure all three types are selected
-         - Improve UX for configuration selection
-      
-      ## Implementation Principles
-      
-      1. Refactore existing code where necessary to avoid tech debt, we want to maintain existing fucnctionality, but dont need to maintain backwards compatibility on the new functionality
-      2. Follow TypeScript Development Principles as outlined in project documentation
-      3. Provide appropriate error handling and user feedback
-      4. Use existing configuration management patterns
-      5. Follow the Single Responsibility Principle for all component changes
-      6. Add clear logging for debugging purposes
-      
-      ## Files to Modify
-      
-      ### Frontend Files
-      - `/Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/contexts/JobContext.tsx`
-      - `/Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/components/JobCreator.tsx`
-      
-      ## Context
-      
-      The C4H Editor is a frontend for the C4H Services API, which expects job configurations in a specific format. The C4H Services API expects three key configuration sections:
-      
-      1. **Workorder**: Defines what work to perform and against which asset
-      2. **Team**: Configures LLM and orchestration settings
-      3. **Runtime**: Sets execution environment parameters
-      
-      The current implementation does not fully align with this structure and lacks configurability for the C4H service endpoint. The changes outlined in this workorder will address these issues.
-      
-      ## Expected Results
-      
-      1. Users should be able to select configurations of each required type (workorder, team, runtime)
-      2. Job submissions should be properly formatted according to the C4H API requirements
-      3. The C4H service endpoint should be configurable via settings
-      4. Error handling should provide clear feedback for missing configurations
-      
-      target_files:
-        - "c4h-micro/packages/job-management/src/contexts/JobContext.tsx"
-        - "c4h-micro/packages/job-management/src/components/JobCreator.tsx"
+        # Backend Job API Redesign
+
+        ## Goal
+        Redesign the backend job API to support immutable job definitions with proper metadata tracking. Create a more consistent model where the frontend submits a job request with configuration tuples and receives a complete job object.
+
+        ## Current Issues
+        1. Inconsistent job submission models between different API endpoints
+        2. Lack of clear immutability in job definitions
+        3. Limited tracking of job metadata changes
+        4. Validation errors when frontend submits in the wrong format
+        5. No clear differentiation between job definition and job state
+
+        ## Required Changes
+        NOTE - do not maintain backward compatibility with the old API. The new API 
+        should be a complete replacement, avoid the build up of technical debt, but do not lose other existing functionality.
+
+        ### 1. Job Data Model Restructuring
+        - Update `job.py` to clearly differentiate between immutable job definition and mutable job state
+        - Add a job history/audit log model for tracking metadata changes
+        - Ensure configuration references are immutable once created
+        - Add versioning for job state changes
+
+        ### 2. API Endpoint Consolidation
+        - Consolidate `/api/v1/jobs` endpoint to handle a single, consistent job creation format
+        - Deprecate the legacy job submission format
+        - Add new endpoint for tracking job history: `/api/v1/jobs/{job_id}/history`
+        - Ensure all error responses include actionable information
+
+        ### 3. Job Request/Response Schema
+        - Create a simplified `JobRequest` schema that accepts:
+          - Configuration references for workorder, team/teamconfig, runtime/runtimeconfig
+          - Optional user_id and job_configuration
+        - Create a comprehensive `JobResponse` schema that includes:
+          - All job metadata (ID, timestamps, status)
+          - The immutable configuration references
+          - Current state information
+          - Links to history/audit information
+
+        ### 4. Job Status Update Flow
+        - Modify job update process to store state changes in history
+        - Ensure each state transition is properly timestamped and attributed
+        - Add transaction support to prevent partial updates
+        - Add proper status transition validation
+
+        ### 5. C4H Service Integration
+        - Update `c4h_service.py` to properly map between internal job model and service model
+        - Add better error handling and response parsing
+        - Ensure service responses are properly mapped back to our job model
+
+
+        ## Implementation Requirements
+        - All data models should properly use type hints
+        - API responses should follow RESTful best practices
+        - Error messages should be clear and actionable
+        - Backward compatibility should be maintained temporarily with appropriate deprecation warnings
+        - Performance should be considered, particularly for job history queries
+
+        The primary goal is to create a consistent, well-structured API where the frontend can reason about jobs as complete entities, with clear tracking of state changes while maintaining the immutability of the core job definition.
 
 # Team section - contains LLM and orchestration settings
 team:
@@ -150,7 +146,6 @@ team:
         tartxt_config:
           script_path: "/Users/jim/src/apps/c4h/c4h_agents/skills/tartxt.py"
           input_paths:
-            - "c4h-micro/"
             - "backend/"
             - "/Users/jim/src/apps/c4h_projects/docs/design_docs/c4h_api_doc_v1.md"
           exclusions:
@@ -365,8 +360,8 @@ team:
             4. No explanations or headers allowed or conversational text
 
       semantic_merge:
-        provider: "openai"
-        model: "o3-mini"
+        provider: "anthropic"
+        model: "claude-3-7-sonnet-20250219"
         temperature: 0
         merge_config:
           preserve_formatting: true
@@ -475,8 +470,8 @@ team:
             Any non-code content will break the processing pipeline.
 
       coder:
-        provider: "openai"
-        model: "o3-mini"
+        provider: "anthropic"
+        model: "claude-3-opus-20240229"
         temperature: 0
         prompts:
           system: |
@@ -502,7 +497,7 @@ team:
             6. Handle errors gracefully with backups
             7. Validate code after changes
 
-runtime:        
+runtime:
   # Lineage tracking configuration  
   lineage:
     enabled: true
@@ -522,7 +517,7 @@ runtime:
   # Backup settings  
   backup:
     enabled: false
-
+  
   # Logging configuration
   logging:
     level: "INFO"
@@ -531,4 +526,3 @@ runtime:
     truncate:
       prefix_length: 100
       suffix_length: 100
-
