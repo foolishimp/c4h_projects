@@ -35,11 +35,9 @@ tartxt.py \
  -f /Users/jim/src/apps/c4h_editor/backup_txt/c4h_editor_full.txt
 
 tartxt.py \
-   /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell \
    /Users/jim/src/apps/c4h_editor/c4h-micro/packages/config-selector \
    /Users/jim/src/apps/c4h_editor/c4h-micro/packages/config-editor \
    /Users/jim/src/apps/c4h_editor/c4h-micro/packages/yaml-editor \
-   /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared \
   -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**" \
   -f /Users/jim/src/apps/c4h_editor/backup_txt/c4h_editor_micro.txt
 
@@ -59,12 +57,21 @@ I want you provide sufficient context such that the llm receiving this will be a
 
 
 
-
+## c4h full
 tartxt.py \
    /Users/jim/src/apps/c4h/c4h_agents \
    /Users/jim/src/apps/c4h/c4h_services \
- -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**" \
+  /Users/jim/src/apps/c4h/config \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**,**/*.toml,**/*.md" \
   -f /Users/jim/src/apps/c4h/backup_txt/c4h_full.txt
+
+
+## c4h agents
+tartxt.py \
+   /Users/jim/src/apps/c4h/c4h_agents \
+  /Users/jim/src/apps/c4h/config \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**,**/*.toml,**/*.md" \
+  -f /Users/jim/src/apps/c4h/backup_txt/c4h_agents.txt
 
 
 tartxt.py \
@@ -108,6 +115,14 @@ tartxt.py \
    /Users/jim/src/apps/c4h/c4h_agents \
  -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**" \
   -f /Users/jim/src/apps/c4h/backup_txt/c4h_agents.txt
+
+
+### Design docs 
+
+tartxt.py \
+    /Users/jim/src/apps/c4h_projects/docs/design_docs/ \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**" \
+ -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_design_master_doc.txt
 
 
 
@@ -600,3 +615,23 @@ python ./c4h_services/src/bootstrap/prefect_runner.py  job \
           5. Apply changes exactly as specified
           6. Handle errors gracefully with backups
           7. Validate code after changes
+
+
+python3 /Users/jim/src/apps/c4h/c4h_agents/skills/tartxt.py  -f changed_files.txt $(git status --porcelain | awk '{print $2}')
+
+python3 /Users/jim/src/apps/c4h/c4h_agents/skills/tartxt.py -o backend/models/job.py backend/services/job_repository.py c4h-micro/packages/job-management/src/contexts/JobContext.tsx c4h-micro/packages/shared/src/services/apiService.ts c4h-micro/packages/shared/src/types/job.ts
+
+
+
+
+python ./c4h_services/src/bootstrap/prefect_runner.py  jobs -P 5500 \
+--config /Users/jim/src/apps/c4h_projects/self_improvement/20250402_03_MVP_JobSubmission_back.yml \
+--stage coder --lineage-file workspaces/lineage/20250408/wf_1303_aeaea888-d4d3-436e-9183-37702cea13b5/events/130546_5de4ff87-a5e6-47ff-b34f-1727d7b2e435.json
+
+
+
+python ./c4h_services/src/bootstrap/prefect_runner.py  jobs -P 5500 \
+--config /Users/jim/src/apps/c4h_projects/self_improvement/20250402_03_MVP_JobSubmission_back.yml \
+--stage coder --lineage-file workspaces/lineage/20250409/wf_0242_9ac05a34-cb5f-4ee2-8b7a-6f8e305ef1ce/events/024413_e9b29496-e8f5-43cf-99b7-29f1aabea904.json
+
+

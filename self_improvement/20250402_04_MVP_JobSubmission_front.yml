@@ -1,73 +1,91 @@
+
 workorder:
   project:
-    path: "/Users/jim/src/apps/c4h_editor"
+    path: "/Users/jim/src/apps/c4h_editor/"
     workspace_root: "workspaces"
-  
+
   intent:
     description: |
-        # Backend Job API Redesign
+      # Frontend Job API Implementation - Phase 2
 
-        ## Goal
-        Redesign the backend job API to support immutable job definitions with proper metadata tracking. Create a more consistent model where the frontend submits a job request with configuration tuples and receives a complete job object.
+      ## Goal
+      Update the frontend components to work with the redesigned job API, 
+      ensuring proper job creation, tracking, and management using the new 
+      immutable job model.
 
-        Read the API documentation -
-        Read the Agent desing principles - 
+      ## Current Issues
+      1. Inconsistent structure being sent for job creation, review the Python API for the correct format
+      2. Error handling for job submission and tracking is minimal
+      3. Job context doesn't properly maintain job state
+      4. Direct API calls instead of using the shared service
+      5. Inconsistent typing and validation of job data
 
+      ## Required Changes
 
-        ## Current Issues
-        1. Inconsistent job submission models between different API endpoints
-        2. Lack of clear immutability in job definitions
-        3. Limited tracking of job metadata changes
-        4. Validation errors when frontend submits in the wrong format
-        5. No clear differentiation between job definition and job state
+      ### 1. Job Creation Flow Redesign
+      - Update `JobContext.tsx` to implement the new job creation model:
+        - Submit configuration references in the correct format
+        - Handle the returned job object properly
+        - Store the complete job object for future reference
+      - Update `JobCreator.tsx` to collect the necessary information:
+        - Select configurations for workorder, team, and runtime
+        - Validate selections before submission
+        - Provide clear feedback during the submission process
 
-        ## Required Changes
-        NOTE - do not maintain backward compatibility with the old API. The new API 
-        should be a complete replacement, avoid the build up of technical debt, but do not lose other existing functionality.
+      ### 2. Job Type Definitions
+      - Update `job.ts` with proper type definitions that match the backend model:
+        - Define `JobRequest` interface for submission
+        - Define `Job` interface for the returned job object
+        - Define types for job status, job history, and other related entities
+      - Ensure strict typing for all job-related operations
 
-        ### 1. Job Data Model Restructuring
-        - Update `job.py` to clearly differentiate between immutable job definition and mutable job state
-        - Add a job history/audit log model for tracking metadata changes
-        - Ensure configuration references are immutable once created
-        - Add versioning for job state changes
+      ### 3. API Service Enhancements
+      - Update `apiService.ts` to properly communicate with the backend:
+        - Remove mock implementations
+        - Implement proper error handling and retries
+        - Format requests according to the new API specification
+        - Properly parse and validate responses
+      - Make API service the single point of truth for job operations
 
-        ### 2. API Endpoint Consolidation
-        - Consolidate `/api/v1/jobs` endpoint to handle a single, consistent job creation format
-        - Deprecate the legacy job submission format
-        - Add new endpoint for tracking job history: `/api/v1/jobs/{job_id}/history`
-        - Ensure all error responses include actionable information
+      ### 4. Job Listing and Filtering
+      - Update `JobsList.tsx` to work with the new job model:
+        - Display jobs with proper filtering
+        - Show relevant job metadata
+        - Provide actions appropriate to job status
+      - Implement proper pagination and sorting
 
-        ### 3. Job Request/Response Schema
-        - Create a simplified `JobRequest` schema that accepts:
-          - Configuration references for workorder, team/teamconfig, runtime/runtimeconfig
-          - Optional user_id and job_configuration
-        - Create a comprehensive `JobResponse` schema that includes:
-          - All job metadata (ID, timestamps, status)
-          - The immutable configuration references
-          - Current state information
-          - Links to history/audit information
+      ### 5. Job Detail Display
+      - Update `JobDetails.tsx` to show comprehensive job information:
+        - Display immutable configuration references
+        - Show current status and history
+        - Provide appropriate actions based on job status
+        - Add visual indicators for job progress
 
-        ### 4. Job Status Update Flow
-        - Modify job update process to store state changes in history
-        - Ensure each state transition is properly timestamped and attributed
-        - Add transaction support to prevent partial updates
-        - Add proper status transition validation
+      ### 6. Error Handling and User Feedback
+      - Implement consistent error handling across all job operations
+      - Add loading states and progress indicators
+      - Provide clear, actionable error messages
+      - Add retry functionality for failed operations
 
-        ### 5. C4H Service Integration
-        - Update `c4h_service.py` to properly map between internal job model and service model
-        - Add better error handling and response parsing
-        - Ensure service responses are properly mapped back to our job model
+      ### 7. Job Status Polling
+      - Implement efficient job status polling:
+        - Poll only active jobs (not completed or failed)
+        - Use appropriate intervals based on job status
+        - Properly handle polling errors
+        - Stop polling when job reaches terminal state
 
-        ## Implementation Requirements
-        - All data models should properly use type hints
-        - API responses should follow RESTful best practices
-        - Error messages should be clear and actionable
-        - Backward compatibility should be maintained temporarily with appropriate deprecation warnings
-        - Performance should be considered, particularly for job history queries
+      ## Implementation Requirements
+      - Follow TypeScript Design Principles document strictly
+      - Use proper type definitions for all components
+      - Maintain consistent error handling patterns
+      - Use React hooks appropriately for state management
+      - Ensure responsive design for all components
+      - Add comprehensive comments for complex logic
 
-        The primary goal is to create a consistent, well-structured API where the frontend can reason about jobs as complete entities, with clear tracking of state changes while maintaining the immutability of the core job definition.
+      The frontend changes should result in a consistent, 
+      type-safe implementation that properly communicates 
+      with the backend API and provides a smooth user experience for job management.
 
-# Team section - contains LLM and orchestration settings
 team:
   llm_config:
     providers:
@@ -75,7 +93,7 @@ team:
         api_base: "https://api.anthropic.com"
         context_length: 200000
         env_var: "ANTHROPIC_API_KEY"
-        default_model: "claude-3-7-sonnet-20250219"
+        default_model: "claude-3-5-sonnet-20241022"
         valid_models:
           - "claude-3-7-sonnet-20250219"
           - "claude-3-5-sonnet-20241022"
@@ -150,7 +168,9 @@ team:
           script_path: "/Users/jim/src/apps/c4h/c4h_agents/skills/tartxt.py"
           input_paths:
             - "backend/"
+            - "c4h-micro/packages/"
             - "/Users/jim/src/apps/c4h_projects/docs/design_docs/c4h_api_doc_v1.md"
+            - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Agent_Design_Principles_v2.md"
           exclusions:
             - "**/node_modules/**"
             - "**/.git/**"
@@ -165,9 +185,9 @@ team:
       solution_designer:
         provider: "anthropic"
         model: "claude-3-7-sonnet-20250219"
-        temperature: 1
+        temperature: 0
         extended_thinking:
-          enabled: true
+          enabled: false
           budget_tokens: 32000
         prompts:
           system: |
@@ -340,8 +360,8 @@ team:
             1. Return ONLY the raw JSON array of valid file changes
 
       semantic_slow_extractor:
-        provider: "anthropic"
-        model: "claude-3-7-sonnet-20250219"
+        provider: "openai"
+        model: "o3-mini"
         temperature: 0
         prompts:
           system: |
@@ -555,3 +575,4 @@ runtime:
     truncate:
       prefix_length: 100
       suffix_length: 100
+
