@@ -1,4 +1,4 @@
-# C4H Services API Integration Guide (Updated)
+# C4H Services API Integration Guide (v1.1)
 
 ## Introduction
 
@@ -8,7 +8,7 @@ This guide provides comprehensive details for integrating with the C4H Services 
 
 The C4H Services exposes two primary API interfaces:
 
-### Jobs API (Recommended)
+### Jobs API (Current Standard)
 - `POST /api/v1/jobs` - Submit a new job with structured configuration
 - `GET /api/v1/jobs/{job_id}` - Check status of an existing job
 
@@ -24,7 +24,7 @@ The C4H Services exposes two primary API interfaces:
 
 ### Jobs vs. Workflows
 
-The Jobs API is the recommended interface, providing a more structured configuration model with clear separation of concerns:
+The Jobs API is the current standard interface, providing a structured configuration model with clear separation of concerns:
 - **Workorder**: Contains project and intent information
 - **Team**: Contains LLM and orchestration configuration
 - **Runtime**: Contains runtime settings and environment config
@@ -45,7 +45,7 @@ The system uses a team-based approach where specialized agent teams handle diffe
 
 ## API Reference
 
-### Submit Job (Recommended)
+### Submit Job
 
 ```
 POST /api/v1/jobs
@@ -116,6 +116,7 @@ POST /api/v1/jobs
 ```
 GET /api/v1/jobs/{job_id}
 ```
+This endpoint returns the current status of a job, including any changes made to files.
 
 #### Response
 
@@ -136,6 +137,31 @@ GET /api/v1/jobs/{job_id}
       }
     }
   ]
+}
+```
+
+### List Jobs
+
+```
+GET /api/v1/jobs
+```
+
+This endpoint returns a list of all jobs, with optional pagination and filtering.
+
+#### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| page | integer | Page number (default: 1) |
+| limit | integer | Items per page (default: 25) |
+| status | string | Filter by status (e.g., "pending", "success") |
+
+#### Response
+
+```json
+{
+  "items": [/* array of job objects */],
+  "total": 42
 }
 ```
 
@@ -231,7 +257,7 @@ GET /health
 
 ## Configuration Structure
 
-The Jobs API uses a structured configuration with three main sections:
+The Jobs API uses a structured configuration with three main sections that should be included in your request:
 
 ### Workorder Section
 
@@ -331,7 +357,7 @@ The frontend implementation for the Jobs API follows these design patterns:
 
 ### 1. Job Context Management
 
-```typescript
+```tsx
 // JobContext.tsx
 interface JobContextType {
   currentJob: Job | null;
@@ -339,6 +365,7 @@ interface JobContextType {
   createJob: (request: JobRequest) => Promise<Job>;
   getJobStatus: (jobId: string) => Promise<Job>;
   pollJobStatus: (jobId: string) => void;
+  listJobs: (page?: number, limit?: number, status?: string) => Promise<JobListResponse>;
   stopPolling: (jobId: string) => void;
   getLogs: (jobId: string, options?: LogOptions) => Promise<LogEntry[]>;
 }
@@ -364,13 +391,27 @@ export const JobProvider: React.FC<{children: React.ReactNode}> = ({ children })
       throw error;
     }
   };
+  
+  // Get a list of jobs with pagination and filtering
+  const listJobs = async (page = 1, limit = 25, status?: string): Promise<JobListResponse> => {
+    try {
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+      if (status) params.append('status', status);
+      
+      return await apiService.listJobs(params);
+    } catch (error) {
+      console.error("Failed to list jobs:", error);
+      throw error;
+    }
+  };
 
   // Other job management methods...
 };
 ```
 
 ### 2. Type Definitions
-
 ```typescript
 // job.ts
 export interface JobRequest {
@@ -399,6 +440,12 @@ export interface Job {
   log_path?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface JobListResponse {
+  items: Job[];
+  total: number;
+  page?: number;
 }
 
 export interface LogEntry {
@@ -434,6 +481,20 @@ export const createJob = async (jobRequest: JobRequest): Promise<Job> => {
   return await response.json();
 };
 
+export const listJobs = async (params: URLSearchParams): Promise<JobListResponse> => {
+  const response = await fetch(`${API_BASE_URL}/api/v1/jobs?${params.toString()}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new ApiError(response.status, errorData?.error || 'Failed to list jobs');
+  }
+  
+  return await response.json();
+};
+
 export const getLogs = async (jobId: string, options?: LogOptions): Promise<LogEntry[]> => {
   const queryParams = new URLSearchParams();
   queryParams.append('job_id', jobId);
@@ -453,10 +514,14 @@ export const getLogs = async (jobId: string, options?: LogOptions): Promise<LogE
 ```typescript
 // JobsList.tsx
 export const JobsList: React.FC = () => {
-  const { jobHistory } = useJobContext();
-  const [filter, setFilter] = useState<JobStatus | 'all'>('all');
+  const { listJobs } = useJobContext();
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [statusFilter, setStatusFilter] = useState<JobStatus | 'all'>('all');
+  const [loading, setLoading] = useState(false);
   
-  const filteredJobs = useMemo(() => {
     if (filter === 'all') return jobHistory;
     return jobHistory.filter(job => job.status === filter);
   }, [jobHistory, filter]);
@@ -464,6 +529,15 @@ export const JobsList: React.FC = () => {
   return (
     <div className="jobs-list">
       <div className="filter-controls">
+        <TextField
+          label="Search Jobs"
+          variant="outlined"
+          size="small"
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment>,
+          }}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
         {/* Filter controls */}
       </div>
       
@@ -472,7 +546,6 @@ export const JobsList: React.FC = () => {
           <tr>
             <th>Job ID</th>
             <th>Status</th>
-            <th>Created</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -483,17 +556,24 @@ export const JobsList: React.FC = () => {
               <td>
                 <StatusBadge status={job.status} />
               </td>
-              <td>{formatDate(job.created_at)}</td>
-              <td>
-                <button onClick={() => viewJobDetails(job.job_id)}>Details</button>
-                {job.status === 'error' && 
-                <button onClick={() => viewJobLogs(job.job_id)}>Logs</button>
-                  <button onClick={() => retryJob(job.job_id)}>Retry</button>}
-              </td>
+              <td>{formatDate(job.created_at || '')}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      
+      <TablePagination
+        component="div"
+        count={total}
+        page={page - 1}
+        onPageChange={(_, newPage) => setPage(newPage + 1)}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={(e) => {
+          setRowsPerPage(parseInt(e.target.value, 10));
+          setPage(1);
+        }}
+        rowsPerPageOptions={[25, 50, 100]}
+      />
     </div>
   );
 };
@@ -505,7 +585,7 @@ export const JobsList: React.FC = () => {
 // JobDetails.tsx
 export const JobDetails: React.FC<{jobId: string}> = ({ jobId }) => {
   const { getJobStatus } = useJobContext();
-  const [job, set null>(null);
+  const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -888,5 +968,24 @@ export class ErrorBoundary extends React.Component<{fallback: React.ReactNode}> 
    - Lineage tracking for workflow traceability
    - Correlation IDs across components
    - Filterable log viewer with search capabilities
-}
-]
+
+6. **Security Considerations**
+   - API key management with environment variables
+   - Input validation for all form submissions
+   - Secure storage of job history
+   - Authentication integration points
+   - Rate limiting for API requests
+
+7. **Accessibility Features**
+   - ARIA attributes for interactive components
+   - Keyboard navigation support
+   - Screen reader compatible status indicators
+   - Color contrast compliance
+   - Focus management for modal dialogs
+
+8. **Deployment Considerations**
+   - Environment-specific configuration
+   - API base URL configuration
+   - Error tracking integration
+   - Analytics integration
+   - Feature flagging support

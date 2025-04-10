@@ -10,6 +10,13 @@ tartxt.py \
   -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**" \
   -f /Users/jim/src/apps/c4h_editor/backup_txt/c4h_editor_micro.txt
 
+## Config Managment
+tartxt.py \
+   /Users/jim/src/apps/c4h_editor/c4h-micro/packages/config-editor \
+   /Users/jim/src/apps/c4h_editor/c4h-micro/packages/yaml-editor \
+   /Users/jim/src/apps/c4h_editor/backend \
+  -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**" \
+  -f /Users/jim/src/apps/c4h_editor/backup_txt/c4h_editor_micro.txt
 
 ## Job Management
 tartxt.py \
@@ -31,14 +38,14 @@ tartxt.py \
 tartxt.py \
   /Users/jim/src/apps/c4h_editor/c4h-micro/ \
   /Users/jim/src/apps/c4h_editor/backend/ \
- -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**" \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**" \
  -f /Users/jim/src/apps/c4h_editor/backup_txt/c4h_editor_full.txt
 
 tartxt.py \
    /Users/jim/src/apps/c4h_editor/c4h-micro/packages/config-selector \
    /Users/jim/src/apps/c4h_editor/c4h-micro/packages/config-editor \
    /Users/jim/src/apps/c4h_editor/c4h-micro/packages/yaml-editor \
-  -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**" \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**" \
   -f /Users/jim/src/apps/c4h_editor/backup_txt/c4h_editor_micro.txt
 
 tartxt.py \

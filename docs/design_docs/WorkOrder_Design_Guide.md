@@ -1,4 +1,4 @@
-# C4H Agent System: Prompt Design Guidelines
+# C4H Agent System: Work Order Design Guidelines
 
 ## Purpose of This Guide
 
@@ -6,7 +6,7 @@ This document provides guidance on how to create effective prompts (work orders)
 
 ## Config Structure Overview
 
-The C4H Agent System uses a hierarchical configuration model with two main sections:
+The C4H Agent System uses a hierarchical configuration model with three main sections:
 
 1. **System Configuration** - Defines the agent infrastructure, providers, and global settings
 2. **Intent Configuration (Work Order)** - Specifies what you want the system to do
@@ -60,7 +60,7 @@ logging:
 
 ### Key System Configuration Components
 
-1. **Project Settings**
+1. **Project Settings** (Required)
    - `path`: Absolute path to the project being processed
    - `workspace_root`: Where workspace and outputs are stored
 
@@ -86,7 +86,7 @@ logging:
 4. **Logging Configuration**
    - Controls verbosity and format of logs
 
-## Intent Configuration (Work Order) Section
+## Intent Configuration (Work Order) Section (Required)
 
 The intent configuration defines what you want the system to do:
 
@@ -110,7 +110,7 @@ intent:
     Explain the desired outcome in detail.
 ```
 
-### Best Practices for Intent Description
+## Best Practices for Intent Description
 
 1. **Be Clear and Specific**
    - State exactly what you want the system to do
@@ -137,6 +137,21 @@ intent:
    - Any specific tests or checks that should be performed
    - Expected performance characteristics
 
+6. **Provide Context and Background**
+   - Explain the current state of the code
+   - Describe any existing patterns or conventions
+   - Mention relevant design documents or principles
+
+7. **Use Structured Sections**
+   - Goal/Objective (what you want to accomplish)
+   - Current Implementation Context (what exists now)
+   - Required Changes (what needs to change)
+   - Design Principles to Follow (how to approach the changes)
+   - Files to Modify (where to make changes)
+
+8. **Reference Existing Code**
+   - Mention specific files, functions, or classes that need modification
+
 ## Complete Work Order Template
 
 Here's a complete template combining both system and intent configurations:
@@ -152,18 +167,27 @@ project:
 # Intent description (the actual work order)
 intent:
   description: |
-    [DETAILED DESCRIPTION OF WHAT YOU WANT TO ACCOMPLISH]
+    # [TITLE OF WORK ORDER]
     
-    Goal:
+    ## Goal
     [CLEAR STATEMENT OF END GOAL]
     
-    Required Changes:
+    ## Current Implementation Context
+    - [DESCRIPTION OF CURRENT CODE]
+    - [RELEVANT PATTERNS OR CONVENTIONS]
+    - [ISSUES WITH CURRENT IMPLEMENTATION]
+    
+    ## Required Changes
     1. [FIRST CHANGE]
     2. [SECOND CHANGE]
     3. [THIRD CHANGE]
     
+    **READ** and **ADHERE** to the principles outlined in the relevant design documents.
+    
     Implementation Requirements:
     - [REQUIREMENT 1]
+    - [REQUIREMENT 2]
+    - [REQUIREMENT 3]
     - [REQUIREMENT 2]
     - [REQUIREMENT 3]
     
@@ -171,9 +195,9 @@ intent:
     - [PRINCIPLE 1]
     - [PRINCIPLE 2]
     
-    Files to Modify:
-    - [FILE PATH 1]
-    - [FILE PATH 2]
+    ## Files to Modify
+    - [FILE PATH 1] - [BRIEF DESCRIPTION OF CHANGES NEEDED]
+    - [FILE PATH 2] - [BRIEF DESCRIPTION OF CHANGES NEEDED]
 
 # LLM configuration
 llm_config:
@@ -224,7 +248,7 @@ logging:
 
 ## Work Order Examples
 
-Here are a few example work orders for common tasks:
+Here are some example work orders for common tasks:
 
 ### Example 1: Adding Error Handling
 
@@ -232,7 +256,7 @@ Here are a few example work orders for common tasks:
 intent:
   description: |
     Add comprehensive error handling to the application with proper logging.
-    
+
     Goal:
     Implement a consistent error handling system across all service functions that captures
     context, provides clear error messages, and ensures proper logging.
@@ -261,7 +285,7 @@ intent:
 intent:
   description: |
     Optimize database queries in the data access layer to improve performance.
-    
+
     Goal:
     Reduce API response times by optimizing database queries, implementing caching,
     and reducing unnecessary data fetching.
@@ -295,7 +319,7 @@ intent:
 intent:
   description: |
     Add user authentication with JWT tokens and role-based access control.
-    
+
     Goal:
     Implement a secure authentication system with JWT tokens, user roles,
     and protected routes.
@@ -328,6 +352,59 @@ intent:
     - src/config/app.js
 ```
 
+### Example 4: Frontend Component Refactoring
+
+```yaml
+intent:
+  description: |
+    # Refactor Frontend Grid Components
+
+    ## Goal
+    Standardize and enhance the frontend grid components used for displaying data lists.
+    Implement features for sorting, pagination, dynamic filtering, and make rows clickable
+    for navigation, following Material UI best practices.
+
+    ## Current Implementation Context
+    - The current grid components use basic Material UI Tables
+    - They lack consistent sorting, pagination, and filtering capabilities
+    - Each row has an explicit "Actions" column with buttons
+    - Different components use inconsistent patterns for data display
+
+    ## Required Changes
+    **READ** and **ADHERE** to the principles outlined in the Typescript_Design_Principles.md document.
+
+    1. Implement Sorting:
+       - Add clickable column headers with TableSortLabel
+       - Implement sort state management
+       - Apply sorting logic to displayed data
+
+    2. Implement Pagination:
+       - Add TablePagination component
+       - Configure for 25, 50, and 100 rows per page
+       - Implement page state management
+
+    3. Implement Filtering:
+       - Add search field with dynamic filtering
+       - Update displayed rows based on filter text
+
+    4. Make Rows Clickable:
+       - Remove dedicated "Actions" column
+       - Make entire row clickable for navigation
+       - Add appropriate styling for clickable rows
+
+    ## Design Principles to Follow
+    - Follow TypeScript design principles for type safety
+    - Use Material UI components according to documentation
+    - Maintain separation of concerns
+    - Ensure components remain reusable
+
+    ## Files to Modify
+    - src/components/DataGrid.tsx - Implement base grid functionality
+    - src/components/UserList.tsx - Update to use enhanced grid
+    - src/components/ConfigList.tsx - Update to use enhanced grid
+    - src/contexts/DataContext.tsx - Update state management if needed
+```
+
 ## Workflow Sequence
 
 When the C4H Agent System processes your work order, it follows this sequence:
@@ -356,7 +433,7 @@ When the C4H Agent System processes your work order, it follows this sequence:
 
 ## Tips for Optimal Results
 
-1. **Be Specific and Detailed**
+1. **Be Specific and Detailed** 
    - The more specific your intent description, the better the results
    - Include examples where helpful
 
@@ -375,5 +452,18 @@ When the C4H Agent System processes your work order, it follows this sequence:
 5. **Review the Plan**
    - Check the solution design before proceeding to implementation
    - Provide feedback if necessary
+
+6. **Use Structured Formatting**
+   - Markdown headings and lists improve readability
+   - Numbered lists help prioritize changes
+   - Code blocks for examples are helpful
+
+7. **Reference Design Documents**
+   - Explicitly mention relevant design documents
+   - Highlight key principles that should be followed
+
+8. **Provide Context**
+   - Explain why changes are needed
+   - Describe the current implementation and its limitations
 
 By following these guidelines, you'll create effective work orders that leverage the full capabilities of the C4H Agent System while adhering to its design principles.
