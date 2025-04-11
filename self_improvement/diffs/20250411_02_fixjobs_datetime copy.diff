@@ -1,0 +1,20 @@
+===CHANGE_BEGIN===
+FILE: backend/api/routes/jobs.py
+TYPE: modify
+DESCRIPTION: Use model_dump(mode='json') in submit_multi_configs to correctly serialize datetime objects before sending to httpx.
+DIFF:
+--- a/backend/api/routes/jobs.py
++++ b/backend/api/routes/jobs.py
+@@ -372,8 +372,8 @@
+                 repo = get_config_repository(config_ref.config_type)
+                 config = repo.get_config(config_ref.id, config_ref.version or "latest")
+                 
+-                # Convert to dict and add type info if not present
+-                config_dict = config.dict() if hasattr(config, "dict") else dict(config)
++                # Convert Pydantic model to JSON-compatible dict directly
++                config_dict = config.model_dump(mode='json') # NEW - Use model_dump(mode='json')
+                 # Ensure config_type is present if needed by downstream service
+                 if "config_type" not in config_dict:
+                      config_dict["config_type"] = config_ref.config_type
+
+===CHANGE_END===

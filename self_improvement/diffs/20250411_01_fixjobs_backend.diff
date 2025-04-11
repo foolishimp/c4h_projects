@@ -1,0 +1,143 @@
+===CHANGE_BEGIN===
+FILE: backend/api/routes/jobs.py
+TYPE: modify
+DESCRIPTION: Modify /api/v1/jobs/multi-config endpoint to accept a list of configurations directly ({ "configurations": [...] }) instead of named fields, aligning with frontend submission and fixing the 422 error. Update the endpoint signature, request model, and background task handling.
+DIFF:
+--- a/backend/api/routes/jobs.py
++++ b/backend/api/routes/jobs.py
+@@ -6,7 +6,7 @@
+ import logging
+ import traceback
+ import asyncio
+-from fastapi import APIRouter, HTTPException, Depends, Query, Path, Body, BackgroundTasks
++from fastapi import APIRouter, HTTPException, Depends, Query, Path, Body, BackgroundTasks, Request
+ from pydantic import BaseModel, Field, validator
+ from functools import cached_property
+ 
+@@ -33,6 +33,13 @@
+         if v not in valid: raise ValueError(f"config_type must be one of {valid}")
+         return v
+ 
++# NEW Model to match frontend payload structure for multi-config endpoint
++class JobListRequest(BaseModel):
++    configurations: List[JobConfigReference] = Field(..., min_length=1) # Ensure list is not empty
++    user_id: Optional[str] = None
++    job_configuration: Optional[Dict[str, Any]] = None
++    # If overrides are needed, consider how they fit here. They were part of JobTupleRequest.
++
+ class JobTupleRequest(BaseModel):
+     workorder: JobConfigReference;
+     team: JobConfigReference; runtime: JobConfigReference
+@@ -266,12 +273,13 @@
+ 
+ @router.post("/multi-config", response_model=JobResponse, summary="Create a job with multiple configurations")
+ async def create_job_multi_config(
+-    request: JobTupleRequest, background_tasks: BackgroundTasks,
+-    job_repo: JobRepository = Depends(get_job_repository), 
+-    c4h_service: C4HService = Depends(get_c4h_service) 
++    # request: JobTupleRequest, # OLD MODEL
++    request: JobListRequest, # NEW MODEL - Use the model matching the frontend
++    background_tasks: BackgroundTasks,
++    job_repo: JobRepository = Depends(get_job_repository),
++    c4h_service: C4HService = Depends(get_c4h_service)
+ ):
+     """Create a job with multiple configurations using the new multi-config submission approach."""
+-    try:
+         # Create record first
+         configurations = { rt.config_type: {"id": rt.id, "version": rt.version or "latest"} 
+                            for rt in request.all_references if rt.id }
+@@ -280,13 +288,24 @@
+         for req in required:
+             if req not in configurations or not configurations[req].get("id"):
+                 raise HTTPException(status_code=400, detail=f"Missing/invalid config for: {req}")
+-        
+-   
+-     # Create job record
++
++        # Create job record
+         job = job_repo.create_job(configurations=configurations, user_id=request.user_id, 
+                                   configuration=request.job_configuration)
+         logger.info("jobs.create_multi.record_created", extra={"job_id": job.id, "status": job.status.value})
+-        
++
++        # --- START CHANGE ---
++        # Pass the actual list of references from the request to the background task
++        # background_tasks.add_task(submit_multi_configs, job, job_repo, c4h_service, request) # OLD - passing JobTupleRequest
++        background_tasks.add_task(submit_multi_configs, job, job_repo, c4h_service, request.configurations) # NEW - passing the list
++        # --- END CHANGE ---
++
+         # Format response
+         configurations_response = {ct: {"id": ref.id, "version": ref.version} for ct, ref in job.configurations.items()}
+         result_dict = job.result.dict() if job.result else None
+@@ -344,7 +363,11 @@
+ 
+ 
+ async def submit_multi_configs(job: Job, job_repo: JobRepository, c4h_service: C4HService, request: JobTupleRequest):
++async def submit_multi_configs(
++    job: Job, job_repo: JobRepository, c4h_service: C4HService,
++    # request: JobTupleRequest # OLD
++    config_references: List[JobConfigReference] # NEW - Accept the list directly
++):
+     """Background task to submit job with multiple configurations to C4H service."""
+     try:
+         # 1. Load all configurations as dictionaries
+@@ -352,16 +375,17 @@
+         
+         # First add any overrides (highest priority)
+         if request.overrides:
+-            config_list.extend(request.overrides)
+-            logger.info(f"Added {len(request.overrides)} override configurations")
+-        
++        # if request.overrides: # OLD - 'request' is no longer JobTupleRequest
++        #    config_list.extend(request.overrides)
++        #    logger.info(f"Added {len(request.overrides)} override configurations")
++        # TODO: Re-evaluate how overrides should be handled if they are still needed with JobListRequest
++
+         # Load standard configurations in priority order
+-        
+-        for config_ref in request.all_references:
++        # for config_ref in request.all_references: # OLD
++        for config_ref in config_references: # NEW - Iterate over the passed list
+             if not config_ref or not config_ref.id:
+                 continue
+                 
+@@ -371,7 +395,7 @@
+                 
+                 # Convert to dict and add type info if not present
+                 config_dict = config.dict() if hasattr(config, "dict") else dict(config)
+-                if "config_type" not in config_dict:
++                # Ensure config_type is present if needed by downstream service
++                if "config_type" not in config_dict:
+                      config_dict["config_type"] = config_ref.config_type
+                     
+                 config_list.append(config_dict)
+@@ -380,6 +404,9 @@
+                 logger.error(f"Failed to load {config_ref.config_type} configuration {config_ref.id}: {e}")
+                 
++        if not config_list:
++            raise ValueError("No valid configurations could be loaded for submission.")
++
+         # 2. Submit configurations to C4H service
+         submission = await c4h_service.submit_job_with_configs(config_list)
+         
+@@ -391,6 +418,7 @@
+         else:
+             job.service_job_id = submission.job_id
+             job.update_status(JobStatus.SUBMITTED)
++            logger.info("jobs.background.submitted_to_service", extra={"job_id": job.id, "service_job_id": submission.job_id, "service_status": submission.status})
+             
+         job_repo.update_job(job, add_audit_entry=True)
+         logger.info(f"Multi-config job submission complete: job_id={job.id}, status={job.status.value}")
+@@ -398,5 +426,9 @@
+         logger.error(f"Error in submit_multi_configs: {e}", exc_info=True)
+    
+      job.update_status(JobStatus.FAILED); job.result = JobResult(error=f"Background submission failed: {str(e)}")
++    try: # Attempt to mark job as failed in repo
++        job.update_status(JobStatus.FAILED)
++        job.result = JobResult(error=f"Background submission task failed: {str(e)}")
+         job_repo.update_job(job, add_audit_entry=True)
++    except Exception as repo_err:
++        logger.error("jobs.background.failed_status_update_failed", extra={"job_id": job.id, "repo_error": str(repo_err)})
+ # --- Ensure router is included in the main FastAPI app ---
+
+===CHANGE_END===

@@ -1,0 +1,64 @@
+===CHANGE_BEGIN===
+FILE: backend/api/routes/jobs.py
+TYPE: modify
+DESCRIPTION: Modify submit_multi_configs background task to extract only the 'content' dictionary from each loaded configuration before adding it to the list sent to the C4H service. This ensures the C4H service's merge logic receives the correctly structured data.
+DIFF:
+--- a/backend/api/routes/jobs.py
++++ b/backend/api/routes/jobs.py
+@@ -361,7 +361 ):
+     """Background task to submit job with multiple configurations to C4H service."""
+     try:
+         # 1. Load all configurations and extract their CONTENT for the service payload
+-        config_list = []
++        config_list_for_service = [] # List to hold config *content* for the C4H service
+         for config_ref in config_references: # NEW - Iterate over the passed list
+             if not config_ref or not config_ref.id:
+                 continue
+@@ -370,24 +371,27 @@
+                 repo = get_config_repository(config_ref.config_type)
+                 # Load the full Pydantic model instance from the editor's repo
+                 config = repo.get_config(config_ref.id, config_ref.version or "latest")
++                
++                # --- START CHANGE ---
++                # Extract *only* the 'content' part and ensure it's JSON-serializable
++                if hasattr(config, 'content'):
++                    content_data = config.content
++                    # If content itself is a Pydantic model, dump it correctly. Otherwise, assume dict.
++                    if hasattr(content_data, 'model_dump'):
++                        serializable_content = content_data.model_dump(mode='json')
++                    elif isinstance(content_data, dict):
++                         # Basic serialization for plain dicts just in case, handles datetimes
++                         serializable_content = json.loads(json.dumps(content_data, default=str))
++                    else:
++                         logger.warning(f"Background: Content for {config_ref.id} is not a dict or Pydantic model, type: {type(content_data)}. Skipping.")
++                         continue # Skip if content structure is unexpected
+ 
+-                # --- START CHANGE ---
+-                # Convert the Pydantic model to a JSON-compatible dictionary.
+-                # .model_dump(mode='json') handles datetime serialization correctly.
+-                config_dict = config.model_dump(mode='json')
+-                # --- END CHANGE ---
+-
+-                # Ensure config_type is present if needed by downstream service
+-                # (This check might be redundant now depending on model_dump output)
+-                if "config_type" not in config_dict:
+-                     config_dict["config_type"] = config_ref.config_type
+-
+-                config_list.append(config_dict)
++                    config_list_for_service.append(serializable_content)
++                # --- END CHANGE ---
+                 logger.info(f"Background: Added {config_ref.config_type} configuration {config_ref.id}")
+             except Exception as e:
+                 logger.error(f"Background: Failed to load/process {config_ref.config_type} configuration {config_ref.id}: {e}")
+                 raise # Propagate error to fail the job
+ 
+-        if not config_list:
++        if not config_list_for_service:
+              raise ValueError("No valid configuration content could be prepared for submission.")
+ 
+         # Submit the list containing ONLY the content dictionaries
+-        submission = await c4h_service.submit_job_with_configs(config_list)
++        submission = await c4h_service.submit_job_with_configs(config_list_for_service)
+ 
+         # ... rest of the function (updating job status) remains the same ...
+         # 3. Update job record with result

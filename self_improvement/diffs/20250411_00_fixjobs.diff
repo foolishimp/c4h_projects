@@ -1,10 +1,10 @@
 ===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared/src/services/apiService.ts
+FILE: c4h-micro/packages/shared/src/services/apiService.ts
 TYPE: modify
 DESCRIPTION: Update submitJobConfigs to call the /api/v1/jobs/multi-config endpoint instead of /api/v1/jobs.
 DIFF:
---- a/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared/src/services/apiService.ts
-+++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared/src/services/apiService.ts
+--- a/c4h-micro/packages/shared/src/services/apiService.ts
++++ b/c4h-micro/packages/shared/src/services/apiService.ts
 @@ -331,7 +331,7 @@
        user_id: userId || 'current-user',
        job_configuration: jobConfiguration || { max_runtime: 3600, notify_on_completion: true }
@@ -17,12 +17,12 @@ DIFF:
 
 ===CHANGE_END===
 ===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor/backend/api/routes/jobs.py
+FILE: backend/api/routes/jobs.py
 TYPE: modify
 DESCRIPTION: Remove the old /api/v1/jobs route handler (create_job) and its associated background task (submit_and_update).
 DIFF:
---- a/Users/jim/src/apps/c4h_editor/backend/api/routes/jobs.py
-+++ b/Users/jim/src/apps/c4h_editor/backend/api/routes/jobs.py
+--- a/backend/api/routes/jobs.py
++++ b/backend/api/routes/jobs.py
 @@ -287,34 +287,6 @@
          raise HTTPException(status_code=500, detail=f"Failed to get job: {str(e)}")
  
@@ -90,12 +90,12 @@ DIFF:
 
 ===CHANGE_END===
 ===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/components/JobCreator.tsx
+FILE: c4h-micro/packages/job-management/src/components/JobCreator.tsx
 TYPE: modify
 DESCRIPTION: Remove unused axios import.
 DIFF:
---- a/Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/components/JobCreator.tsx
-+++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/components/JobCreator.tsx
+--- a/c4h-micro/packages/job-management/src/components/JobCreator.tsx
++++ b/c4h-micro/packages/job-management/src/components/JobCreator.tsx
 @@ -13,7 +13,6 @@
  } from '@mui/material';
  import { configTypes, api, JobConfigReference } from 'shared';
@@ -107,12 +107,12 @@ DIFF:
 
 ===CHANGE_END===
 ===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/contexts/JobContext.tsx
+FILE: c4h-micro/packages/job-management/src/contexts/JobContext.tsx
 TYPE: modify
 DESCRIPTION: Remove unused api and configTypes imports.
 DIFF:
---- a/Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/contexts/JobContext.tsx
-+++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/contexts/JobContext.tsx
+--- a/c4h-micro/packages/job-management/src/contexts/JobContext.tsx
++++ b/c4h-micro/packages/job-management/src/contexts/JobContext.tsx
 @@ -2,7 +2,7 @@
  // File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/contexts/JobContext.tsx
  
