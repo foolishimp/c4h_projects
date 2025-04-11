@@ -1,0 +1,9 @@
+# apply_config.yml
+workorder:
+  project:
+    path: ""
+  intent:
+    description: "used only for apply diff mode"
+runtime:
+  backup:
+    enabled: true

@@ -1,0 +1,68 @@
+workorder:
+  project:
+    path: /Users/jim/src/apps/c4h_editor/c4h-micro/
+    workspace_root: workspaces
+  intent:
+    description: |
+      # Refactor Editor Frontend for Direct Multi-Config Job Submission
+
+      ## Goal
+      Update the C4H Editor Micro-Frontend (`JobCreator.tsx`, context) to assemble a job request as a **list** of selected configuration references (potentially including overrides defined in the UI or other config sources) and submit this list **directly** to the editor's backend service. The frontend should **not** call a separate `/configs/merge` utility endpoint.
+
+      ## Core Algorithm Context (from C4H Service Refactor)
+      - **Motivation:** The C4H Service now handles merging internally when `/jobs` receives a list. The frontend's role is simply to gather the relevant configuration pieces (e.g., selected Workorder ID, selected Team ID, selected Runtime ID, potentially UI-defined overrides) and send them as an ordered list to the editor backend.
+      - The C4H Service `POST /api/v1/jobs` accepts `List[Dict[str, Any]]`.
+      - The C4H Service **internally** performs the sequential, right-to-left merge.
+      - A separate utility endpoint `POST /api/v1/configs/merge` exists but is **not** used for standard job submission.
+
+      ## Required Changes
+
+      1.  **Update Job Creation UI/Logic (`packages/job-management/src/components/JobCreator.tsx`):**
+          - Modify `handleSubmit`: Assemble selected config references (e.g., `{ id: workorderId, config_type: 'workorder', version: 'latest' }`, etc.) into a **list** `[workorderRef, teamRef, runtimeRef]`. Ensure the order reflects desired merge priority (leftmost = highest). *Future:* Consider how UI could add override fragments to this list.
+          - Pass this *list* to the context's submission function (e.g., `submitJobTuple`).
+      2.  **Update Context Submission Function (`packages/job-management/src/contexts/JobContext.tsx`):**
+          - Modify the function (e.g., `submitJobTuple`) to accept the *list* of config references.
+          - Update the call to the editor's backend API (`apiService.submitJob`) to send the data as a JSON array representing the list. Adjust `apiService.ts` if needed.
+      3.  **Types (`packages/shared/src/types/`):** Update TypeScript types for job submission parameters to use arrays/lists of configuration references.
+
+      ## Design Principles to Follow
+      - Adhere strictly to `Typescript_Design_Principles.md`.
+      - Follow React best practices.
+      - Ensure type safety for the list-based submission.
+
+      ## Files to Analyze/Modify (Primary)
+      - `packages/job-management/src/components/JobCreator.tsx`
+      - `packages/job-management/src/contexts/JobContext.tsx`
+      - `packages/shared/src/services/apiService.ts`
+      - `packages/shared/src/types/job.ts`
+team:
+  llm_config:
+    agents:
+      discovery:
+        temperature: 0
+        tartxt_config:
+          script_path: /Users/jim/src/apps/c4h/c4h_agents/skills/tartxt.py
+          input_paths:
+            - packages/job-management/src/
+            - packages/config-selector/src/
+            - packages/shared/src/
+            - /Users/jim/src/apps/c4h_projects/docs/design_docs/Typescript_Design_Principles.md
+            - /Users/jim/src/apps/c4h_projects/docs/design_docs/c4h_api_doc_v1.md
+            - /Users/jim/src/apps/c4h_projects/docs/design_docs/Jobs_Design_Guide_0402.md
+          exclusions:
+            - '**/node_modules/**'
+            - '**/dist/**'
+            - '**/*.css'
+      solution_designer:
+        provider: anthropic
+        model: claude-3-7-sonnet-20250219
+      coder:
+        provider: anthropic
+        model: claude-3-7-sonnet-20250219
+runtime:
+  logging:
+    level: INFO
+    format: structured
+    agent_level: DEBUG
+  backup:
+    enabled: true

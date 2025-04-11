@@ -642,3 +642,37 @@ python ./c4h_services/src/bootstrap/prefect_runner.py  jobs -P 5500 \
 --stage coder --lineage-file workspaces/lineage/20250409/wf_0242_9ac05a34-cb5f-4ee2-8b7a-6f8e305ef1ce/events/024413_e9b29496-e8f5-43cf-99b7-29f1aabea904.json
 
 
+tests/setup/setup_test_projects.sh  && \
+python ./c4h_services/src/bootstrap/prefect_runner.py  workflow \
+--config tests/examples/config/0228_02_applylogging.yml \
+2>&1 | tee output.txt
+
+tests/setup/setup_test_projects.sh  && \
+python ./c4h_services/src/bootstrap/prefect_runner.py apply_diff \
+    --project-path "./test/test_projects" \
+    --diff-file tests/setup/apply_diff.yml \
+    --config tests/examples/config/0228_02_applylogging.yml \
+    --poll
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+tests/setup/setup_test_projects.sh  && \ 
+python ./c4h_services/src/bootstrap/prefect_runner.py apply_diff \
+    --project-path "." \
+    --diff-file tests/setup/jobs_coder_01_actual.diff \
+    --config tests/setup/apply_config.yml \
+    --poll
+
+
+
+python /Users/jim/src/apps/c4h/c4h_services/src/bootstrap/prefect_runner.py apply_diff \
+    --project-path "." \
+    --diff-file tests/setup/jobs_coder_01_actual.diff \
+    --config tests/setup/apply_config.yml \
+    --poll
+
+
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h_editor" \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250411_00_fixjobs.diff \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --poll
