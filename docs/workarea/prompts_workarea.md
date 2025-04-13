@@ -311,3 +311,79 @@ prefect_runner.py apply_diff \
     --project-path "/Users/jim/src/apps/c4h_editor" \
     --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
     --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250411_03_fixjobs_config.diff
+
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h_editor" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250411_04_add_widgets.diff
+
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h_editor" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250411_05_add_midwindow.diff
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" &&
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h_editor" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250412_01_fixdebug.diff
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" &&                                                      
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250412_03_configmerge.diff
+
+
+workorder:
+  project:
+    path: /Users/jim/src/apps/c4h/tests/test_projects/
+    workspace_root: workspaces
+  intent:
+    description: |
+      Add logging to all functions with lineage tracking:
+      - Replace print statements with logging
+      - Add logging configuration
+      - Enable lineage tracking for observability
+
+team:
+  llm_config:
+    agents:
+      discovery:
+        temperature: 0
+        tartxt_config:
+          script_path: /Users/jim/src/apps/c4h/c4h_agents/skills/tartxt.py
+          input_paths:
+            - packages/job-management/src/
+            - packages/config-selector/src/
+            - packages/shared/src/
+            - /Users/jim/src/apps/c4h_projects/docs/design_docs/Typescript_Design_Principles.md
+            - /Users/jim/src/apps/c4h_projects/docs/design_docs/c4h_api_doc_v1.md
+            - /Users/jim/src/apps/c4h_projects/docs/design_docs/Jobs_Design_Guide_0402.md
+          exclusions:
+            - '**/node_modules/**'
+            - '**/dist/**'
+            - '**/*.css'
+      solution_designer:
+        provider: anthropic
+        model: claude-3-7-sonnet-20250219
+
+
+
+tartxt.py \
+   /Users/jim/src/apps/c4h/c4h_agents \
+   /Users/jim/src/apps/c4h/c4h_services \
+  /Users/jim/src/apps/c4h/config \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**,**/*.toml,**/*.md" \
+  -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_full.txt
+
+tartxt.py \
+  /Users/jim/src/apps/c4h_editor/c4h-micro/packages \
+  /Users/jim/src/apps/c4h_editor/backend/ \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**,**/*.toml,**/*.md" \
+ -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_editor_full.txt
+
+tartxt.py \
+    /Users/jim/src/apps/c4h_projects/docs/design_docs/ \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**" \
+ -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_design_master_doc.txt

@@ -1,0 +1,137 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
+TYPE: modify
+DESCRIPTION: Refactor main layout to include Middle Editor Area and Right Jobs Sidebar using MUI Box and Flexbox.
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
++++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
+@@ -1,12 +1,12 @@
+ import React, { Suspense, lazy, useEffect } from 'react';
+ import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
+ import { createTheme } from '@mui/material/styles';
+-import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
++import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+ 
+ import Navigation from './components/common/Navigation';
+ import { remotes } from 'shared';
+ import ConfigTypeSelector from './components/create/ConfigTypeSelector';
+-
++ 
+ // Lazy load remote components
+ const ConfigManager = lazy(() => import('configSelector/ConfigManager'));
+ const JobManager = lazy(() => import('jobManagement/JobManager'));
+@@ -73,29 +73,53 @@
+ // Main App component
+ function App() {
+   const drawerWidth = 240;
++  const jobsSidebarWidth = 350; // Define width for the Jobs sidebar
++
+   // Make remotes globally available for better error handling
+   useEffect(() => {
+     console.log('Available remotes:', remotes);
+   }, []);
++
+   return (
+     <ThemeProvider theme={theme}>
+       <CssBaseline />
+       <Router>
+         <Box sx={{ display: 'flex' }}>
++          {/* AppBar and Left Drawer */}
+           <Navigation drawerWidth={drawerWidth} />
+-          <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8, ml: `${drawerWidth}px` }}>
+-            <ErrorBoundary>
+-              <Suspense fallback={<Loading />}>
+-        
+-         <Routes>
++
++          {/* Main Content Area (to the right of Drawer) */}
++          <Box
++            component="main"
++            sx={{
++              flexGrow: 1,
++              mt: 8, // AppBar height
++              ml: `${drawerWidth}px`, // Left Drawer width
++              height: 'calc(100vh - 64px)', // Full height below AppBar
++              display: 'flex', // Use flexbox for side-by-side layout
++              overflow: 'hidden' // Prevent overall page scroll
++            }}
++          >
++            {/* Middle Editor Area */}
++            <Box sx={{ flexGrow: 1, p: 3, height: '100%', overflowY: 'auto' }}> {/* Allow scrolling */}
++              <ErrorBoundary>
++                <Suspense fallback={<Loading />}>
++                  <Routes>
+                   {/* Home route redirects to configs */}
+                   <Route path="/" element={<Navigate to="/configs/workorder" replace />} />
+-                  
++
+                   {/* Config management routes */}
+-                  <Route path="/configs/create" element={<ConfigTypeSelector />} />
+-                  <Route 
+-                    path="/configs/:configType" 
+-                    element={<ConfigManagerWrapper />} 
++                  <Route path="/configs/create" element={<ConfigTypeSelector />} />
++                  <Route
++                    path="/configs/:configType"
++                    element={<ConfigManagerWrapper />}
++                  />
++                  <Route
++                    path="/configs/:configType/:id"
++                    element={<ConfigManagerWrapper />}
+                   />
+-                  <Route 
+-                    path="/configs/:configType/:id" 
+-                    element={<ConfigManagerWrapper />} 
+-                  />
+-                  
+-                  {/* Job management routes */}
+-                  <Route 
+-                    path="/jobs" 
+-                    element={<JobManager />} 
+-                  />
+-                  <Route 
++
++                  {/* Job management routes - Now handled by sidebar, maybe keep for direct linking? */}
++                  {/* <Route
++                    path="/jobs"
++                    element={<JobManager />} // Consider if direct route is needed
++                  /> */}
++                  <Route
+                     path="/jobs/:id"
+                     element={<JobManager />} 
+                   />
+@@ -103,10 +127,23 @@
+                   {/* Fallback for unknown routes */}
+                   <Route path="*" element={<Navigate to="/" replace />} />
+                 </Routes>
++                </Suspense>
++              </ErrorBoundary>
++            </Box>
++
++            {/* Right Jobs Sidebar */}
++            <Box
++              sx={{
++                width: `${jobsSidebarWidth}px`,
++                flexShrink: 0,
++                borderLeft: '1px solid rgba(0, 0, 0, 0.12)', // Visual divider
++                height: '100%',
++                overflowY: 'auto', // Allow scrolling within the sidebar
++                p: 2 // Add some padding
++              }}
++            >
++              <ErrorBoundary>
++                <Suspense fallback={<Loading />}>
++                  <JobManager />
++                </Suspense>
+               </ErrorBoundary>
++            </Box>
+           </Box>
+-         </Box>
+       </Router>
+     </ThemeProvider>
+   );
+ }
+ 
+ export default App;
++
+===CHANGE_END===

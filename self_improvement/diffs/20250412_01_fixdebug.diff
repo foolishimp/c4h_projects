@@ -1,0 +1,35 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/backend/api/routes/jobs.py
+TYPE: modify
+DESCRIPTION: Add DEBUG level logging for the request payload within the submit_multi_configs background task.
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/backend/api/routes/jobs.py
++++ b/Users/jim/src/apps/c4h_editor/backend/api/routes/jobs.py
+@@ -17,7 +17,8 @@
+ from backend.dependencies import get_job_repository, get_c4h_service
+ from backend.models.job import StatusChangeEvent # Import if used in update_job
+ 
+-# --- Logger setup ---
++# --- Logger setup --- (Import necessary modules)
++import logging
+ logging.basicConfig(level=logging.INFO)
+ logger = get_logger(__name__)
+ 
+@@ -357,6 +358,14 @@
+         if not config_list_for_service:
+              raise ValueError("No valid configuration content could be prepared for submission.")
+ 
++        # --- ADDED: Log the payload before sending ---
++        payload = {"configs": config_list_for_service}
++        try:
++            payload_json = json.dumps(payload, indent=2, default=str) # Use default=str for datetimes etc.
++            logger.debug(f"Background: Attempting POST request to C4H Service /api/v1/jobs with payload:\n{payload_json}")
++        except Exception as json_err:
++            logger.error(f"Background: Failed to serialize payload for logging: {json_err}")
++        # --- END ADDED ---
++
+         # Submit the list containing ONLY the content dictionaries
+         submission = await c4h_service.submit_job_with_configs(config_list_for_service)
+ 
+
+===CHANGE_END===

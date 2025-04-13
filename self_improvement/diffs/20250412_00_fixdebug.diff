@@ -1,0 +1,22 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/backend/main.py
+TYPE: modify
+DESCRIPTION: Remove hardcoded INFO level from logging.basicConfig to allow Uvicorn --log-level to control the level.
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/backend/main.py
++++ b/Users/jim/src/apps/c4h_editor/backend/main.py
+@@ -20,11 +20,7 @@
+ from backend.api.middleware import RequestLoggingMiddleware, APIErrorLoggingMiddleware
+ from backend.dependencies import get_job_repository, get_c4h_service
+ 
+-# Configure logging
+-logging.basicConfig(
+-    level=logging.INFO,
+-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+-)
++# Configure base logger (level will be controlled by Uvicorn command line)
+ logger = logging.getLogger(__name__)
+ 
+ # Create API request logger
+
+===CHANGE_END===

@@ -1,0 +1,50 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h/c4h_agents/agents/base_agent.py
+TYPE: modify
+DESCRIPTION: Add detailed DEBUG logging within BaseAgent.__init__ to show the full config received and the resolved provider/model values.
+DIFF:
+--- a/Users/jim/src/apps/c4h/c4h_agents/agents/base_agent.py
++++ b/Users/jim/src/apps/c4h/c4h_agents/agents/base_agent.py
+@@ -3,7 +3,7 @@
+ """
+ 
+ # Original imports...
+-from typing import Dict, Any, Optional, List, Tuple
++from typing import Dict, Any, Optional, List, Tuple
+ import structlog
+ import json
+ from pathlib import Path
+@@ -33,11 +33,20 @@
+             self.config["system"] = {}
+             
+         # Store agent ID in system namespace
+-        self.config["system"]["agent_id"] = self.agent_id
++        self.config["system"]["agent_id"] = self.agent_id
++
++        # --- ADDED: Log the full configuration received by the agent ---
++        try:
++            config_dump = json.dumps(self.config, indent=2, default=str)
++            logger.debug(f"{agent_name}.__init__.received_config", config_json=config_dump)
++        except Exception as e:
++            logger.error(f"{agent_name}.__init__.config_dump_failed", error=str(e))
++        # --- END ADDED ---
+             
+         # 
+         # Resolve provider, model, and temperature using hierarchical lookup
+         agent_path = f"llm_config.agents.{agent_name}"
+         provider_name = self.config_node.get_value(f"{agent_path}.provider") or self.config_node.get_value("llm_config.default_provider") or "anthropic"
++        # --- ADDED: Log resolved provider ---
++        logger.debug(f"{agent_name}.__init__.resolved_provider", provider_name=provider_name)
++        # --- END ADDED ---
+         self.provider = LLMProvider(provider_name)
+         
+         self.model = self.config_node.get_value(f"{agent_path}.model") or self.config_node.get_value("llm_config.default_model") or "claude-3-opus-20240229"
+         self.temperature = self.config_node.get_value(f"{agent_path}.temperature") or 0
++        # --- ADDED: Log resolved model ---
++        logger.debug(f"{agent_name}.__init__.resolved_model", model_name=self.model)
++        # --- END ADDED ---
+         
+         # Continuation settings
+        
+
+===CHANGE_END===
