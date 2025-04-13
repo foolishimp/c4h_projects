@@ -335,6 +335,19 @@ prefect_runner.py apply_diff \
     --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250412_03_configmerge.diff
 
 
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250412_04_configmerge.diff
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250412_05_fixsemantic_iterator.diff
+
+
 workorder:
   project:
     path: /Users/jim/src/apps/c4h/tests/test_projects/

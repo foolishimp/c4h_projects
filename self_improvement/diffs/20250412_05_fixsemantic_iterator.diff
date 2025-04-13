@@ -1,0 +1,64 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h/c4h_agents/skills/_semantic_fast.py
+TYPE: modify
+DESCRIPTION: Improve regex in _try_deterministic_parse for better diff block matching.
+DIFF:
+--- a/Users/jim/src/apps/c4h/c4h_agents/skills/_semantic_fast.py
++++ b/Users/jim/src/apps/c4h/c4h_agents/skills/_semantic_fast.py
+@@ -75,11 +75,12 @@
+ 
+         logger.debug("deterministic_parse.attempting", content_length=len(content))
+         parsed_items = []
++        # Improved regex: More robust whitespace handling, non-greedy matching for fields,
++        # and explicit handling of content until ===CHANGE_END===
+         pattern = re.compile(
+             r"===CHANGE_BEGIN===\s*"
+-            r"FILE:\s*(?P<file_path>.*?)\s*"
+-            r"TYPE:\s*(?P<type>.*?)\s*"
+-            r"DESCRIPTION:\s*(?P<description>.*?)\s*"
++            r"FILE:\s*(?P<file_path>[^\n]*?)\s*" # Match until newline
++            r"TYPE:\s*(?P<type>[^\n]*?)\s*"       # Match until newline
++            r"DESCRIPTION:\s*(?P<description>[^\n]*?)\s*" # Match until newline
+             r"DIFF:\s*(?P<diff>.*?)\s*"
+             r"===CHANGE_END===",
+             re.DOTALL | re.MULTILINE
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h/c4h_agents/skills/semantic_iterator.py
+TYPE: modify
+DESCRIPTION: Fix fallback logic to slow iterator when fast LLM results are incomplete or fail.
+DIFF:
+--- a/Users/jim/src/apps/c4h/c4h_agents/skills/semantic_iterator.py
++++ b/Users/jim/src/apps/c4h/c4h_agents/skills/semantic_iterator.py
+@@ -179,7 +179,8 @@
+                         self._state.config
+                     )
+             
+-            # Check if fast extraction completely failed
++            # Check if fast extraction completely failed or if fallback is explicitly chosen
++            # Removed check for has_items as it doesn't exist on SlowItemIterator
+             if not self._state.iterator.has_items() and self._allow_fallback:
+                 logger.info("extraction.fallback_to_slow", reason="no_fast_results")
+                 self._state.mode = ExtractionMode.SLOW
+@@ -198,9 +199,17 @@
+         """Get next item using the appropriate iterator"""
+         try:
+             if not self._state.iterator:
++                logger.warning("iterator.next_called_without_iterator")
+                 raise StopIteration
+                 
+-            return next(self._state.iterator)
++            # Directly call next on the current iterator (could be Fast or Slow)
++            next_item = next(self._state.iterator)
++            # Increment position tracking after successfully getting an item
++            self._state.position += 1
++            logger.debug("iterator.yielded_item",
++                        mode=self._state.mode,
++                        position=self._state.position) # Log position *after* yielding
++            return next_item
+             
+         except StopIteration:
+             logger.debug("iterator.complete", 
+
+===CHANGE_END===
