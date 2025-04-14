@@ -1,100 +1,108 @@
-# C4H Services API Integration Guide (v1.1)
+# C4H Services API Integration Guide (v1.1 - Updated)
 
 ## Introduction
 
-This guide provides comprehensive details for integrating with the C4H Services API, a system designed for orchestrating intelligent code refactoring workflows. The API allows you to submit code refactoring intents and receive structured results, making it ideal for building GUI interfaces for code analysis and transformation.
+This guide provides comprehensive details for integrating with the C4H Services API, a system designed for orchestrating intelligent code refactoring workflows. The API allows you to submit code refactoring intents via structured job requests and receive results, making it ideal for building GUI interfaces or programmatic clients for code analysis and transformation.
 
 ## API Overview
 
-The C4H Services exposes two primary API interfaces:
+The C4H Services exposes the following primary API interface:
 
 ### Jobs API (Current Standard)
-- `POST /api/v1/jobs` - Submit a new job with structured configuration
-- `GET /api/v1/jobs/{job_id}` - Check status of an existing job
 
-### Workflow API (Legacy)
-- `POST /api/v1/workflow` - Submit a new workflow request
-- `GET /api/v1/workflow/{workflow_id}` - Check status of an existing workflow
+* `POST /api/v1/jobs` - Submit a new job with one or more configuration fragments for server-side merging.
+* `GET /api/v1/jobs/{job_id}` - Check status and retrieve results of an existing job.
+* `GET /api/v1/jobs` - List existing jobs with optional filtering and pagination.
+* `POST /api/v1/jobs/{job_id}/cancel` - Attempt to cancel a running job (best-effort).
 
 ### Utility Endpoints
-- `GET /health` - Service health check
-- `GET /api/v1/logs` - Retrieve system logs with filtering options
+
+* `GET /health` - Service health check.
+* `GET /api/v1/logs` - Retrieve system logs with filtering options.
+* `POST /api/v1/configs/merge` - Utility endpoint to test configuration merging.
+* `GET /api/v1/config-types` - Retrieve the list of supported configuration types.
+
+### Legacy Workflow API (Deprecated)
+
+The `/api/v1/workflow` endpoints are deprecated and maintained only for backward compatibility. **New integrations must use the Jobs API (`/api/v1/jobs`).**
 
 ## Core Concepts
 
-### Jobs vs. Workflows
+### Multi-Config Job Submission
 
-The Jobs API is the current standard interface, providing a structured configuration model with clear separation of concerns:
-- **Workorder**: Contains project and intent information
-- **Team**: Contains LLM and orchestration configuration
-- **Runtime**: Contains runtime settings and environment config
+The current standard (`POST /api/v1/jobs`) uses a **multi-config** approach. Instead of sending rigidly structured `workorder`, `team`, and `runtime` objects, the client sends a list of configuration dictionaries (fragments) under a top-level `configs` key.
 
-The Workflow API is maintained for backward compatibility but offers less structure.
+The server performs a **deep merge** of these fragments onto a base system configuration. Fragments are merged sequentially from the list, with later fragments overriding earlier ones (e.g., the last fragment in the list has the highest priority). This allows for flexible configuration overrides (e.g., providing job-specific intent alongside standard team/runtime configs).
 
 ### Teams
 
 The system uses a team-based approach where specialized agent teams handle different aspects of the workflow:
-- **Discovery Team** - Analyzes project files and structure
-- **Solution Team** - Designs changes based on intent
-- **Coder Team** - Implements the designed changes
-- **Observability Team** - Tracks lineage and logs across the workflow
-  - Monitors execution flow
-  - Captures decision points
-  - Provides traceability for debugging
-- **Fallback Team** - Handles failures with a simplified approach
+
+* **Discovery Team** - Analyzes project files and structure
+* **Solution Team** - Designs changes based on intent
+* **Coder Team** - Implements the designed changes
+* **Observability Team** - Tracks lineage and logs across the workflow
+    * Monitors execution flow
+    * Captures decision points
+    * Provides traceability for debugging
+* **Fallback Team** - Handles failures with a simplified approach
 
 ## API Reference
 
-### Submit Job
+### Submit Job (Multi-Config)
 
 ```
 POST /api/v1/jobs
 ```
 
+Submits a new job by providing a list of configuration fragments to be merged server-side.
+
 #### Request Body
 
 ```json
 {
-  "workorder": {
-    "project": {
-      "path": "/path/to/project",
-      "workspace_root": "workspaces"
+  "configs": [
+    // Base or shared configurations (lower priority)
+    {
+      "runtime": {
+         // Default runtime settings
+         "logging": { "level": "INFO", "format": "structured"},
+         "backup": { "enabled": true, "path": "workspaces/backups" }
+      },
+      "team": {
+         // Default team/LLM settings
+         "llm_config": {
+             "default_provider": "anthropic",
+             "default_model": "claude-3-5-sonnet-20241022",
+             "providers": { /* ... provider details ... */ }
+         },
+         "orchestration": { /* ... orchestration details ... */ }
+      }
     },
-    "intent": {
-      "description": "Description of your refactoring intent",
-      "target_files": ["optional/file/path.py"]
-    }
-  },
-  "team": {
-    "llm_config": {
-      "default_provider": "anthropic",
-      "default_model": "claude-3-5-sonnet-20241022"
-    },
-    "orchestration": {
-      "enabled": true,
-      "entry_team": "discovery",
-      "lineage": {
-        "enabled": true,
-        "tracking_level": "detailed",
-        "correlation_id": "optional-custom-id",
-        "persist": true
+    // Job-specific configurations (higher priority)
+    {
+      "workorder": {
+        "project": {
+          "path": "/path/to/project",
+          "workspace_root": "workspaces"
+        },
+        "intent": {
+          "description": "Specific intent for this job",
+          "target_files": ["src/file.py"]
+        }
+      },
+      "team": {
+          "llm_config": {
+              "agents": {
+                  "solution_designer": {
+                      "model": "claude-3-opus-20240229" // Override model for this job
+                  }
+              }
+          }
       }
     }
-  },
-  "runtime": {
-    "logging": {
-      "level": "INFO"
-    },
-    "backup": {
-      "enabled": true
-    },
-    "observability": {
-      "logging": {
-        "level": "INFO",
-        "format": "json"
-      }
-    }
-  }
+    // Add more fragments as needed
+  ]
 }
 ```
 
@@ -102,12 +110,10 @@ POST /api/v1/jobs
 
 ```json
 {
-  "job_id": "job_20250402_123456_abcd1234",
-  "status": "pending",
-  "storage_path": "workspaces/lineage/wf_1234_abcd1234",
-  "error": null,
-  "lineage_id": "lin_20250402_123456_abcd1234",
-  "log_path": "workspaces/logs/job_20250402_123456_abcd1234.log"
+  "job_id": "job_20250414_110500_f3a1b2c5",
+  "status": "submitted", // Or 'created' depending on immediate processing
+  "storage_path": "workspaces/lineage/wf_...", // Path if lineage enabled
+  "error": null
 }
 ```
 
@@ -116,24 +122,24 @@ POST /api/v1/jobs
 ```
 GET /api/v1/jobs/{job_id}
 ```
-This endpoint returns the current status of a job, including any changes made to files.
 
-#### Response
+Retrieves the current status and results (if completed) for a specific job.
+
+#### Response (`JobStatus` model)
 
 ```json
 {
-  "job_id": "job_20250402_123456_abcd1234",
-  "status": "success",
-  "storage_path": "workspaces/lineage/wf_1234_abcd1234",
-  "lineage_id": "lin_20250402_123456_abcd1234",
-  "log_path": "workspaces/logs/job_20250402_123456_abcd1234.log",
-  "error": null,
-  "changes": [
+  "job_id": "job_20250414_110500_f3a1b2c5",
+  "status": "success", // e.g., created, submitted, running, success, failed, cancelled
+  "storage_path": "workspaces/lineage/wf_...", // Path to lineage/results if enabled
+  "error": null, // Error message if status is 'failed' or 'error'
+  "changes": [ // Populated when job completes successfully
     {
-      "file": "/path/to/file.py",
-      "change": {
+      "file": "/path/to/project/src/file.py",
+      "change": { // Can contain diff, status, error, type etc. from Coder
         "type": "modify",
         "status": "success"
+        // Potentially other details like 'diff' or 'backup_path' might be included
       }
     }
   ]
@@ -150,19 +156,54 @@ This endpoint returns a list of all jobs, with optional pagination and filtering
 
 #### Query Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| page | integer | Page number (default: 1) |
-| limit | integer | Items per page (default: 25) |
-| status | string | Filter by status (e.g., "pending", "success") |
+| Parameter | Type    | Description                                     |
+| :-------- | :------ | :---------------------------------------------- |
+| `page`    | integer | Page number (default: 1)                        |
+| `limit`   | integer | Items per page (default: 25)                    |
+| `status`  | string  | Filter by status (e.g., "submitted", "success") |
 
 #### Response
 
 ```json
 {
-  "items": [/* array of job objects */],
-  "total": 42
+  "items": [
+    {
+        "job_id": "job_20250414_110500_f3a1b2c5",
+        "status": "success",
+        "created_at": "2025-04-14T11:05:00.123Z",
+        "updated_at": "2025-04-14T11:15:30.456Z",
+        "configurations": { // Shows the IDs of the configs used
+            "workorder": {"id": "wo-123", "version": "latest"},
+            "teamconfig": {"id": "team-default", "version": "1.2"},
+            "runtimeconfig": {"id": "rt-prod", "version": "latest"}
+        },
+        "user_id": "user@example.com"
+    }
+    // ... other job items
+  ],
+  "total": 42, // Total number of jobs matching filters
+  "page": 1,
+  "limit": 25
 }
+```
+
+### Cancel Job
+
+```
+POST /api/v1/jobs/{job_id}/cancel
+```
+Attempts to cancel a job that is currently in a `submitted` or `running` state. Cancellation is best-effort.
+
+#### Response
+
+```json
+{
+  "job_id": "job_20250414_110500_f3a1b2c5",
+  "status": "cancelled", // Or the status at the time of cancellation attempt
+  "storage_path": "workspaces/lineage/wf_...",
+  "error": null // May contain an error if cancellation failed immediately
+}
+
 ```
 
 ### Retrieve Logs
@@ -173,67 +214,67 @@ GET /api/v1/logs?job_id={job_id}&level=INFO&start_time=2025-04-02T12:00:00Z
 
 #### Query Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| job_id | string | Filter logs by job ID |
-| level | string | Filter by log level (DEBUG, INFO, WARNING, ERROR) |
-| start_time | ISO datetime | Filter logs after this time |
-| end_time | ISO datetime | Filter logs before this time |
-| limit | integer | Maximum number of log entries to return |
+| Parameter    | Type         | Description                                         |
+| :----------- | :----------- | :-------------------------------------------------- |
+| `job_id`     | string       | Filter logs by job ID                               |
+| `level`      | string       | Filter by log level (DEBUG, INFO, WARNING, ERROR) |
+| `start_time` | ISO datetime | Filter logs after this time                         |
+| `end_time`   | ISO datetime | Filter logs before this time                        |
+| `limit`      | integer      | Maximum number of log entries to return             |
 
 #### Response
 
 ```json
 {
-  "logs": [{"timestamp": "2025-04-02T12:34:56Z", "level": "INFO", "message": "Job started", "job_id": "job_20250402_123456_abcd1234", "lineage_id": "lin_20250402_123456_abcd1234", "component": "discovery_agent"}]
+  "logs": [
+    {
+        "timestamp": "2025-04-14T11:05:01Z",
+        "level": "INFO",
+        "message": "Job started",
+        "job_id": "job_20250414_110500_f3a1b2c5",
+        "workflow_id": "wf_...",
+        "component": "orchestrator"
+        // ... other log entries ...
+    }
+  ]
 }
 ```
 
-### Submit Workflow (Legacy)
+### Merge Configurations Utility
 
 ```
-POST /api/v1/workflow
+POST /api/v1/configs/merge
 ```
+
+Utility endpoint to test how configuration fragments will be merged by the server. Useful for debugging configuration overrides.
 
 #### Request Body
 
 ```json
 {
-  "project_path": "/path/to/project",
-  "intent": {
-    "description": "Description of your refactoring intent"
-  },
-  "app_config": {
-    "key": "value"
-  },
-  "system_config": {
-    "key": "value"
-  },
-  "lineage_file": "optional/path/to/lineage.json",
-  "stage": "discovery",
-  "keep_runid": true
-  "enable_logging": true
+    "configs": [
+        // List of config dicts to merge (later items override earlier ones)
+        {"runtime": {"logging": {"level": "INFO"}}},
+        {"runtime": {"logging": {"level": "DEBUG", "format": "structured"}}}
+    ],
+    "include_system_config": true // Optional: Merge onto base system config (default: true)
 }
 ```
 
-#### Parameters for Workflow Continuation
-
-| Field | Type | Description |
-|-------|------|-------------|
-| lineage_file | string | Path to lineage file for workflow continuation |
-| stage | string | Stage to continue workflow from ("discovery", "solution_designer", "coder") |
-| keep_runid | boolean | Whether to keep the original run ID from the lineage file (default: true) |
-| enable_logging | boolean | Whether to enable detailed logging (default: true) |
-
-#### Response
+#### Response (`MergeResponse` model)
 
 ```json
 {
-  "workflow_id": "wf_1234_abcd1234",
-  "status": "pending",
-  "storage_path": "workspaces/lineage/wf_1234_abcd1234",
-  "error": null,
-  "log_path": "workspaces/logs/wf_1234_abcd1234.log"
+    "merged_config": {
+        // ... the resulting merged dictionary ...
+        "runtime": {
+            "logging": {
+                "level": "DEBUG", // Overridden by the last fragment
+                "format": "structured" // Added by the last fragment
+            }
+        }
+        // ... other merged sections ...
+    }
 }
 ```
 
@@ -243,113 +284,55 @@ POST /api/v1/workflow
 GET /health
 ```
 
+Provides a simple health status check for the API service.
+
 #### Response
 
 ```json
 {
   "status": "healthy",
-  "version": "1.5.2",
-  "workflows_tracked": 5,
-  "log_level": "INFO",
-  "teams_available": 4
+  "version": "1.1.0", // Example version
+  "workflows_tracked": 15, // Example count
+  "teams_available": 4 // Example count
 }
+```
+
+### Get Configuration Types
+
+```
+GET /api/v1/config-types
+```
+
+Retrieves the list of configuration types known and managed by the backend (e.g., workorder, teamconfig).
+
+#### Response
+
+```json
+[
+    {
+        "type": "workorder",
+        "name": "Work Order",
+        "description": "Defines what needs to be done...",
+        "supportsVersioning": true
+    },
+    {
+        "type": "teamconfig",
+        "name": "Team Configuration",
+        "description": "Defines agent teams...",
+        "supportsVersioning": true
+    },
+    {
+        "type": "runtimeconfig",
+        "name": "Runtime Configuration",
+        "description": "Manages operational aspects...",
+        "supportsVersioning": true
+    }
+]
 ```
 
 ## Configuration Structure
 
-The Jobs API uses a structured configuration with three main sections that should be included in your request:
-
-### Workorder Section
-
-```yaml
-workorder:
-  project:
-    path: "/path/to/project"
-    workspace_root: "workspaces"
-    source_root: "."
-    output_root: "."
-  intent:
-    description: "Add logging to all functions with lineage tracking"
-    target_files:
-      - "src/main.py"
-      - "src/utils.py"
-```
-
-### Team Section
-
-```yaml
-team:
-  llm_config:
-    default_provider: "anthropic"
-    default_model: "claude-3-7-sonnet-20250219"
-    providers:
-      anthropic:
-        api_base: "https://api.anthropic.com"
-        context_length: 200000
-        env_var: "ANTHROPIC_API_KEY"
-        default_model: "claude-3-7-sonnet-20250219"
-      openai:
-        api_base: "https://api.openai.com/v1"
-        env_var: "OPENAI_API_KEY"
-        default_model: "o3-mini"
-    agents:
-      discovery:
-        model: "claude-3-5-sonnet-20241022"
-        temperature: 0
-      solution_designer:
-        model: "claude-3-7-sonnet-20250219"
-        temperature: 0
-      coder:
-        model: "claude-3-7-sonnet-20250219"
-        temperature: 0
-        
-  orchestration:
-    enabled: true
-    entry_team: "discovery"
-    teams:
-      discovery:
-        name: "Discovery Team"
-        tasks:
-          - name: "discovery"
-            agent_class: "c4h_agents.agents.discovery.DiscoveryAgent"
-        routing:
-          default: "solution"
-      observability:
-        name: "Observability Team"
-        tasks:
-          - name: "lineage_tracking"
-            agent_class: "c4h_agents.agents.observability.LineageTrackingAgent"
-          - name: "log_aggregation"
-            agent_class: "c4h_agents.agents.observability.LogAggregationAgent"
-        routing: {}
-```
-
-### Runtime Section
-
-```yaml
-runtime:
-  workflow:
-    storage:
-      enabled: true
-      root_dir: "workspaces/workflows"
-  lineage:
-    enabled: true
-    backend:
-      type: "structured"
-      path: "workspaces/lineage" 
-      format: "json"
-      retention: "30d"
-  logging:
-    level: "INFO"
-    format: "json"
-    handlers:
-      - type: "file"
-        path: "workspaces/logs"
-        rotation: "10MB"
-  backup:
-    enabled: true
-    path: "workspaces/backups"
-```
+While the API accepts fragments in the `configs` list, these fragments typically correspond to sections of the overall configuration structure used internally (Workorder, Team, Runtime). Understanding this structure helps in creating effective fragments. See the `SystemConfig_Design_Guide.md` for full details on the internal configuration structure.
 
 ## Frontend Job API Implementation
 
@@ -359,10 +342,14 @@ The frontend implementation for the Jobs API follows these design patterns:
 
 ```tsx
 // JobContext.tsx
+import React, { createContext, useState, useRef, useCallback } from 'react';
+import { Job, JobRequest, JobListResponse, LogEntry, LogOptions, ApiError, JobStatus } from './types'; // Assuming types are defined
+import { apiService } from './apiService'; // Assuming a service layer exists
+
 interface JobContextType {
   currentJob: Job | null;
   jobHistory: Job[];
-  createJob: (request: JobRequest) => Promise<Job>;
+  createJob: (request: JobRequest) => Promise<Job>; // Use JobRequest here
   getJobStatus: (jobId: string) => Promise<Job>;
   pollJobStatus: (jobId: string) => void;
   listJobs: (page?: number, limit?: number, status?: string) => Promise<JobListResponse>;
@@ -377,21 +364,23 @@ export const JobProvider: React.FC<{children: React.ReactNode}> = ({ children })
   const [jobHistory, setJobHistory] = useState<Job[]>([]);
   const pollingRefs = useRef<{[key: string]: number}>({});
   const [jobLogs, setJobLogs] = useState<{[key: string]: LogEntry[]}>({});
-  
-  // Create a new job with proper validation
-  const createJob = async (request: JobRequest): Promise<Job> => {
+
+  // Create a new job using the multi-config endpoint
+  const createJob = async (configs: Record<string, any>[]): Promise<Job> => {
     try {
-      const newJob = await apiService.createJob(request);
+      // Use the multi-config API function
+      const newJob = await apiService.createJobMultiConfig(configs);
       setCurrentJob(newJob);
       setJobHistory(prev => [newJob, ...prev]);
-      startLogPolling(newJob.job_id);
+      // Optionally start polling or log retrieval
+      // startLogPolling(newJob.job_id);
       return newJob;
     } catch (error) {
       console.error("Failed to create job:", error);
       throw error;
     }
   };
-  
+
   // Get a list of jobs with pagination and filtering
   const listJobs = async (page = 1, limit = 25, status?: string): Promise<JobListResponse> => {
     try {
@@ -399,7 +388,7 @@ export const JobProvider: React.FC<{children: React.ReactNode}> = ({ children })
       params.append('page', page.toString());
       params.append('limit', limit.toString());
       if (status) params.append('status', status);
-      
+
       return await apiService.listJobs(params);
     } catch (error) {
       console.error("Failed to list jobs:", error);
@@ -407,45 +396,123 @@ export const JobProvider: React.FC<{children: React.ReactNode}> = ({ children })
     }
   };
 
-  // Other job management methods...
+  // Get status of a specific job
+  const getJobStatus = async (jobId: string): Promise<Job> => {
+    try {
+        const jobData = await apiService.getJobStatus(jobId); // Assuming apiService has this
+        // Update local state if needed
+        if (currentJob?.job_id === jobId) {
+            setCurrentJob(jobData);
+        }
+        setJobHistory(prev => prev.map(j => j.job_id === jobId ? jobData : j));
+        return jobData;
+    } catch (error) {
+        console.error(`Failed to get status for job ${jobId}:`, error);
+        throw error;
+    }
+  };
+
+  // Poll job status
+  const pollJobStatus = useCallback((jobId: string) => {
+    if (pollingRefs.current[jobId]) {
+        console.log(`Polling already active for job ${jobId}`);
+        return;
+    }
+    const intervalId = window.setInterval(async () => {
+        try {
+            const jobData = await getJobStatus(jobId);
+            if (['success', 'failed', 'error', 'complete', 'cancelled'].includes(jobData.status)) {
+                stopPolling(jobId);
+            }
+        } catch (error) {
+            console.error(`Polling error for job ${jobId}:`, error);
+            stopPolling(jobId); // Stop polling on error
+        }
+    }, 5000); // Poll every 5 seconds
+    pollingRefs.current[jobId] = intervalId;
+  }, [getJobStatus]); // Include getJobStatus in dependencies
+
+  // Stop polling for a job
+  const stopPolling = useCallback((jobId: string) => {
+    if (pollingRefs.current[jobId]) {
+        clearInterval(pollingRefs.current[jobId]);
+        delete pollingRefs.current[jobId];
+        console.log(`Stopped polling for job ${jobId}`);
+    }
+  }, []);
+
+  // Fetch logs for a job
+  const getLogs = async (jobId: string, options?: LogOptions): Promise<LogEntry[]> => {
+      try {
+          const logs = await apiService.getLogs(jobId, options); // Assuming apiService has this
+          setJobLogs(prev => ({ ...prev, [jobId]: logs }));
+          return logs;
+      } catch (error) {
+          console.error(`Failed to fetch logs for job ${jobId}:`, error);
+          throw error;
+      }
+  };
+
+
+  // Provide context value
+  const value = {
+    currentJob,
+    jobHistory,
+    createJob, // Updated function name if changed in context
+    getJobStatus,
+    pollJobStatus,
+    listJobs,
+    stopPolling,
+    getLogs
+  };
+
+  return <JobContext.Provider value={value}>{children}</JobContext.Provider>;
 };
 ```
 
 ### 2. Type Definitions
+
 ```typescript
-// job.ts
-export interface JobRequest {
-  workorder: {
-    project: {
-      path: string;
-      workspace_root?: string;
-    };
-    intent: {
-      description: string;
-      target_files?: string[];
-    };
-  };
-  team?: TeamConfig;
-  runtime?: RuntimeConfig;
-  logging_config?: LoggingConfig;
+// job.ts (Example types)
+export interface JobConfigReference {
+  id: string;
+  config_type: string;
+  version?: string;
+}
+
+export interface MultiConfigJobRequest {
+  configs: Record<string, any>[]; // List of config fragments
+  user_id?: string;
+  job_configuration?: Record<string, any>;
 }
 
 export interface Job {
   job_id: string;
   status: JobStatus;
-  storage_path: string;
-  error: string | null;
+  storage_path?: string;
+  error?: string | null;
   changes?: JobChange[];
-  lineage_id?: string;
-  log_path?: string;
+  // Add other fields returned by GET /jobs/{job_id} like configurations, created_at etc.
+  configurations?: Record<string, { id: string; version: string }>;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface JobChange {
+    file: string;
+    change: {
+        type?: string;
+        status?: string;
+        error?: string;
+        // potentially diff or other details
+    };
 }
 
 export interface JobListResponse {
   items: Job[];
   total: number;
   page?: number;
+  limit?: number;
 }
 
 export interface LogEntry {
@@ -453,274 +520,177 @@ export interface LogEntry {
   level: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
   message: string;
   job_id: string;
-  lineage_id?: string;
+  workflow_id?: string;
   component?: string;
-  context?: Record<string, any>;
-  trace_id?: string;
+  // Add other potential log fields
 }
 
-export type JobStatus = 'pending' | 'running' | 'success' | 'error' | 'complete' | 'failed';
+export interface LogOptions {
+    level?: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
+    startTime?: Date;
+    endTime?: Date;
+    limit?: number;
+}
+
+export type JobStatus = 'created' | 'submitted' | 'running' | 'success' | 'failed' | 'error' | 'complete' | 'cancelled'; // Expanded statuses
+
+// Define ApiError if not already defined
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+    this.name = 'ApiError';
+  }
+}
 ```
 
 ### 3. API Service Implementation
 
 ```typescript
 // apiService.ts
-export const createJob = async (jobRequest: JobRequest): Promise<Job> => {
-  const response = await fetch(`${API_BASE_URL}/api/v1/jobs`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(jobRequest)
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new ApiError(response.status, errorData?.error || 'Failed to create job');
-  }
-  
-  return await response.json();
-};
+import { Job, MultiConfigJobRequest, JobListResponse, LogEntry, LogOptions, ApiError } from './types'; // Adjust import path
 
-export const listJobs = async (params: URLSearchParams): Promise<JobListResponse> => {
-  const response = await fetch(`${API_BASE_URL}/api/v1/jobs?${params.toString()}`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' }
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new ApiError(response.status, errorData?.error || 'Failed to list jobs');
-  }
-  
-  return await response.json();
-};
+const API_BASE_URL = 'http://localhost:8000'; // Or from environment variable
 
-export const getLogs = async (jobId: string, options?: LogOptions): Promise<LogEntry[]> => {
-  const queryParams = new URLSearchParams();
-  queryParams.append('job_id', jobId);
-  if (options?.level) queryParams.append('level', options.level);
-  if (options?.startTime) queryParams.append('start_time', options.startTime.toISOString());
-  if (options?.endTime) queryParams.append('end_time', options.endTime.toISOString());
-  if (options?.limit) queryParams.append('limit', options.limit.toString());
-  
-  const response = await fetch(`${API_BASE_URL}/api/v1/logs?${queryParams.toString()}`);
-  if (!response.ok) throw new ApiError(response.status, 'Failed to fetch logs');
-  return (await response.json()).logs;
+export const apiService = {
+  createJobMultiConfig: async (configs: Record<string, any>[]): Promise<Job> => {
+    const payload = { configs };
+    const response = await fetch(`${API_BASE_URL}/api/v1/jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+      throw new ApiError(response.status, errorData?.error || `HTTP error ${response.status}`);
+    }
+    return await response.json();
+  },
+
+  listJobs: async (params: URLSearchParams): Promise<JobListResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/jobs?${params.toString()}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+      throw new ApiError(response.status, errorData?.error || 'Failed to list jobs');
+    }
+    return await response.json();
+  },
+
+  getJobStatus: async (jobId: string): Promise<Job> => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}`);
+      if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+          throw new ApiError(response.status, errorData?.error || `Failed to get status for job ${jobId}`);
+      }
+      return await response.json();
+  },
+
+  getLogs: async (jobId: string, options?: LogOptions): Promise<LogEntry[]> => {
+    const queryParams = new URLSearchParams({ job_id: jobId });
+    if (options?.level) queryParams.append('level', options.level);
+    if (options?.startTime) queryParams.append('start_time', options.startTime.toISOString());
+    if (options?.endTime) queryParams.append('end_time', options.endTime.toISOString());
+    if (options?.limit) queryParams.append('limit', options.limit.toString());
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/logs?${queryParams.toString()}`);
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+        throw new ApiError(response.status, errorData?.error || 'Failed to fetch logs');
+    }
+    const data = await response.json();
+    return data.logs || []; // Ensure logs array exists
+  }
+  // Add cancelJob etc.
 };
 ```
 
 ### 4. Job Listing Component
 
-```typescript
-// JobsList.tsx
-export const JobsList: React.FC = () => {
-  const { listJobs } = useJobContext();
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [statusFilter, setStatusFilter] = useState<JobStatus | 'all'>('all');
-  const [loading, setLoading] = useState(false);
-  
-    if (filter === 'all') return jobHistory;
-    return jobHistory.filter(job => job.status === filter);
-  }, [jobHistory, filter]);
-  
-  return (
-    <div className="jobs-list">
-      <div className="filter-controls">
-        <TextField
-          label="Search Jobs"
-          variant="outlined"
-          size="small"
-          InputProps={{
-            startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment>,
-          }}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        {/* Filter controls */}
-      </div>
-      
-      <table className="jobs-table">
-        <thead>
-          <tr>
-            <th>Job ID</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredJobs.map(job => (
-            <tr key={job.job_id} className={`status-${job.status}`}>
-              <td>{job.job_id}</td>
-              <td>
-                <StatusBadge status={job.status} />
-              </td>
-              <td>{formatDate(job.created_at || '')}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      
-      <TablePagination
-        component="div"
-        count={total}
-        page={page - 1}
-        onPageChange={(_, newPage) => setPage(newPage + 1)}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={(e) => {
-          setRowsPerPage(parseInt(e.target.value, 10));
-          setPage(1);
-        }}
-        rowsPerPageOptions={[25, 50, 100]}
-      />
-    </div>
-  );
-};
-```
+*(... Job Listing Component example remains largely the same, focusing on displaying data from `listJobs` ...)*
 
 ### 5. Job Details Component
 
-```typescript
-// JobDetails.tsx
-export const JobDetails: React.FC<{jobId: string}> = ({ jobId }) => {
-  const { getJobStatus } = useJobContext();
-  const [job, setJob] = useState<Job | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  
-  useEffect(() => {
-    const fetchJobDetails = async () => {
-      try {
-        setLoading(true);
-        const jobData = await getJobStatus(jobId);
-        setJob(jobData);
-        if (jobData.log_path) fetchJobLogs(jobData.job_id);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : 'Failed to load job details');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchJobDetails();
-    
-    // Start polling if job is in active state
-    if (job && ['pending', 'running'].includes(job.status)) {
-      const pollingInterval = setInterval(fetchJobDetails, 5000);
-      return () => clearInterval(pollingInterval);
-    }
-  }, [jobId, job?.status]);
-  
-  if (loading) return <LoadingSpinner />;
-  if (error) return <ErrorDisplay message={error} onRetry={() => setError(null)} />;
-  if (!job) return <EmptyState message="Job not found" />;
-  
-  return (
-    <div className="job-details">
-      <h2>Job {job.job_id}</h2>
-      <StatusBadge status={job.status} />
-      
-      {job.lineage_id && (
-        <div className="lineage-info">
-          <h3>Lineage ID: {job.lineage_id}</h3>
-        </div>
-      )}
-      
-      <h3>Job Configuration</h3>
-      <pre>{JSON.stringify(job, null, 2)}</pre>
-      
-      <h3>Changes</h3>
-      {job.changes?.map(change => (
-        <FileChangeCard key={change.file} change={change} />
-      ))}
-      
-      <h3>Logs</h3>
-      <LogViewer 
-        logs={logs} 
-        onRefresh={() => fetchJobLogs(job.job_id)}
-        onFilterChange={handleLogFilterChange}
-      />
-    </div>
-  );
-};
-```
+*(... Job Details Component example remains largely the same, focusing on displaying data from `getJobStatus` and potentially `getLogs` ...)*
 
 ### 6. Job Request Form Component
 
 ```typescript
 // JobCreator.tsx
+import React, { useState } from 'react';
+import { Button, TextField, CircularProgress, Alert } from '@mui/material'; // Example imports
+import { useJobContext } from './JobContext'; // Adjust import path
+import { MultiConfigJobRequest, ApiError } from './types'; // Adjust import path
+// import { useNavigate } from 'react-router-dom'; // If using router
+
 export const JobCreator: React.FC = () => {
   const { createJob } = useJobContext();
-  const [formData, setFormData] = useState<Partial<JobRequest>>({
-    workorder: {
-      project: { path: '' },
-      intent: { description: '' }
-    },
-    runtime: {
-      observability: {
-        logging: {
-          level: 'INFO',
-          format: 'json'
-        }
-    }
-  });
+  // State to hold different config fragments
+  const [workorderConfig, setWorkorderConfig] = useState({ project: { path: '' }, intent: { description: '' } });
+  const [teamConfig, setTeamConfig] = useState({ llm_config: { /* ... */ } }); // Example
+  const [runtimeConfig, setRuntimeConfig] = useState({ logging: { level: 'INFO' } }); // Example
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
-  
+  // const navigate = useNavigate();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
+
     // Validation
-    if (!formData.workorder?.project?.path) {
+    if (!workorderConfig.project?.path) {
       setError('Project path is required');
       return;
     }
-    
-    if (!formData.workorder?.intent?.description) {
+    if (!workorderConfig.intent?.description) {
       setError('Intent description is required');
       return;
     }
-    
+
     try {
       setSubmitting(true);
-      const job = await createJob(formData as JobRequest);
-      navigate(`/jobs/${job.job_id}`);
+      // Construct the list of config fragments for the multi-config API
+      const configFragments = [
+        { runtime: runtimeConfig }, // Base runtime config
+        { team: teamConfig },       // Base team config
+        { workorder: workorderConfig } // Job-specific workorder
+        // Add more fragments or overrides as needed
+      ];
+
+      const job = await createJob(configFragments); // Call context function
+      // navigate(`/jobs/${job.job_id}`); // Navigate on success
+      console.log("Job Created:", job); // Placeholder navigation
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create job');
     } finally {
       setSubmitting(false);
     }
   };
-  
+
   return (
     <form onSubmit={handleSubmit}>
       {error && <Alert severity="error">{error}</Alert>}
-      
+
       <TextField
         label="Project Path"
-        value={formData.workorder?.project?.path || ''}
-        onChange={(e) => setFormData(prev => ({ ...prev, workorder: { ...prev.workorder, project: { ...prev.workorder?.project, path: e.target.value } } }))}
+        value={workorderConfig.project.path}
+        onChange={(e) => setWorkorderConfig(prev => ({ ...prev, project: { ...prev.project, path: e.target.value } }))}
         required
+        fullWidth margin="normal"
+      />
+       <TextField
+        label="Intent Description"
+        value={workorderConfig.intent.description}
+        onChange={(e) => setWorkorderConfig(prev => ({ ...prev, intent: { ...prev.intent, description: e.target.value } }))}
+        required
+        fullWidth margin="normal" multiline rows={4}
       />
 
-      <FormControl>
-        <InputLabel>Logging Level</InputLabel>
-        <Select
-          value={formData.runtime?.observability?.logging?.level || 'INFO'}
-          onChange={(e) => setFormData(prev => ({ ...prev, runtime: { ...prev.runtime, observability: { ...prev.runtime?.observability, logging: { ...prev.runtime?.observability?.logging, level: e.target.value } } } }))}
-        >
-          {['DEBUG', 'INFO', 'WARNING', 'ERROR'].map(level => <MenuItem key={level} value={level}>{level}</MenuItem>)}
-        </Select>
-      </FormControl>
-      
-      {/* Other form fields */}
-      
-      <Button type="submit" disabled={submitting}>
+      {/* Add more form fields for other configurations if needed */}
+
+      <Button type="submit" variant="contained" disabled={submitting}>
         {submitting ? <CircularProgress size={24} /> : 'Create Job'}
       </Button>
     </form>
