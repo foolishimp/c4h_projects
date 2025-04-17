@@ -1,0 +1,790 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/database/db.py
+TYPE: create
+DESCRIPTION: Add database connection module with asyncpg support
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/shell_service/database/db.py
+@@ -0,0 +1,99 @@
++"""
++Database connection management module for the Preferences Shell Service.
++Uses asyncpg for PostgreSQL connectivity.
++"""
++
++import asyncio
++import logging
++from typing import Optional, Dict, Any
++import asyncpg
++import os
++from contextlib import asynccontextmanager
++
++logger = logging.getLogger(__name__)
++
++# Get database connection parameters from environment variables
++# with fallbacks to development defaults
++DB_HOST = os.environ.get("DB_HOST", "localhost")
++DB_PORT = os.environ.get("DB_PORT", "5432")
++DB_NAME = os.environ.get("DB_NAME", "c4h_prefs")
++DB_USER = os.environ.get("DB_USER", "postgres")
++DB_PASS = os.environ.get("DB_PASSWORD", "postgres")
++
++# Global connection pool
++pool: Optional[asyncpg.Pool] = None
++
++async def connect():
++    """Establish connection pool to the database."""
++    global pool
++    try:
++        pool = await asyncpg.create_pool(
++            host=DB_HOST,
++            port=DB_PORT,
++            database=DB_NAME,
++            user=DB_USER,
++            password=DB_PASS,
++            min_size=1,
++            max_size=10,
++        )
++        logger.info(f"Connected to PostgreSQL database at {DB_HOST}:{DB_PORT}/{DB_NAME}")
++        return True
++    except Exception as e:
++        logger.error(f"Failed to connect to database: {e}", exc_info=True)
++        pool = None
++        return False
++
++async def disconnect():
++    """Close the database connection pool."""
++    global pool
++    if pool:
++        await pool.close()
++        logger.info("Closed PostgreSQL connection pool")
++        pool = None
++
++async def check_health() -> bool:
++    """Check database connection health."""
++    if not pool:
++        return False
++    
++    try:
++        # Try to execute a simple query
++        async with pool.acquire() as conn:
++            await conn.fetchval("SELECT 1")
++        return True
++    except Exception as e:
++        logger.error(f"Database health check failed: {e}")
++        return False
++
++@asynccontextmanager
++async def get_connection():
++    """Get a database connection from the pool."""
++    if not pool:
++        logger.error("Database pool not initialized. Call connect() first.")
++        raise RuntimeError("Database not connected")
++    
++    conn = await pool.acquire()
++    try:
++        yield conn
++    finally:
++        await pool.release(conn)
++
++# Query execution helper
++async def execute(query: str, *args, fetch_type="all", **kwargs) -> Any:
++    """Execute a database query with proper error handling."""
++    if not pool:
++        logger.error("Database pool not initialized. Call connect() first.")
++        raise RuntimeError("Database not connected")
++    
++    try:
++        async with pool.acquire() as conn:
++            if fetch_type == "all":
++                return await conn.fetch(query, *args, **kwargs)
++            elif fetch_type == "one":
++                return await conn.fetchrow(query, *args, **kwargs)
++            elif fetch_type == "val":
++                return await conn.fetchval(query, *args, **kwargs)
++            elif fetch_type == "status":
++                return await conn.execute(query, *args, **kwargs)
++            else:
++                raise ValueError(f"Invalid fetch_type: {fetch_type}")
++    except Exception as e:
++        logger.error(f"Database query error: {e}", exc_info=True)
++        logger.error(f"Query: {query}, Args: {args}, Kwargs: {kwargs}")
++        raise
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/database/schema.sql
+TYPE: create
+DESCRIPTION: Add comprehensive database schema for preferences storage
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/shell_service/database/schema.sql
+@@ -0,0 +1,53 @@
++-- Database schema for the Preferences Shell Service
++
++-- Create tables if they don't exist
++
++-- Create a table for available app definitions
++CREATE TABLE IF NOT EXISTS available_apps (
++    id TEXT PRIMARY KEY,
++    name TEXT NOT NULL,
++    scope TEXT NOT NULL,
++    module TEXT NOT NULL,
++    url TEXT,
++    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
++    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
++);
++
++-- Create a table for user frames
++CREATE TABLE IF NOT EXISTS frames (
++    id TEXT PRIMARY KEY,
++    user_id TEXT NOT NULL,
++    name TEXT NOT NULL,
++    "order" INTEGER NOT NULL,
++    assigned_apps JSONB NOT NULL DEFAULT '[]',
++    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
++    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
++);
++
++-- Create a unique index on user_id and order to prevent duplicates
++CREATE UNIQUE INDEX IF NOT EXISTS frames_user_id_order_idx ON frames(user_id, "order");
++
++-- Create a table for service endpoints
++CREATE TABLE IF NOT EXISTS service_endpoints (
++    id TEXT PRIMARY KEY,
++    job_config_service_url TEXT NOT NULL,
++    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
++    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
++);
++
++-- Auto-update the updated_at column
++CREATE OR REPLACE FUNCTION update_updated_at_column()
++RETURNS TRIGGER AS $$
++BEGIN
++    NEW.updated_at = NOW();
++    RETURN NEW;
++END;
++$$ LANGUAGE plpgsql;
++
++-- Create triggers for updated_at
++CREATE TRIGGER update_available_apps_updated_at
++    BEFORE UPDATE ON available_apps
++    FOR EACH ROW
++    EXECUTE FUNCTION update_updated_at_column();
++
++CREATE TRIGGER update_frames_updated_at
++    BEFORE UPDATE ON frames
++    FOR EACH ROW
++    EXECUTE FUNCTION update_updated_at_column();
++
++CREATE TRIGGER update_service_endpoints_updated_at
++    BEFORE UPDATE ON service_endpoints
++    FOR EACH ROW
++    EXECUTE FUNCTION update_updated_at_column();
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/database/crud.py
+TYPE: modify
+DESCRIPTION: Enhance CRUD operations with database interaction
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/shell_service/database/crud.py
++++ b/Users/jim/src/apps/c4h_editor/shell_service/database/crud.py
+@@ -1,5 +1,5 @@
+ """
+-Placeholder CRUD operations for the Preferences Shell Service.
++CRUD operations for the Preferences Shell Service.
+ Replace stubs with actual database interactions (e.g., using SQLAlchemy, asyncpg, or an ORM).
+ """
+ 
+@@ -7,8 +7,10 @@
+ from typing import List, Optional, Dict, Any
+ import json
+ from pathlib import Path
++import uuid
+ 
+-from models.preferences import Frame, AppDefinition, ServiceEndpoints # Adjust import path if needed
++from database import db
++from models.preferences import Frame, AppDefinition, ServiceEndpoints, AppAssignment
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -32,26 +34,151 @@
+ 
+ async def get_user_frames(user_id: str) -> List[Frame]:
+     """Stub: Retrieve frames for a user."""
+-    logger.warning(f"STUB: Retrieving frames for user {user_id}. Returning default.")
+-    # TODO: Replace with database query for user_id
+-    return DEFAULT_FRAMES
++    try:
++        # Check if we have database connection
++        if await db.check_health():
++            # Get frames from database
++            rows = await db.execute(
++                """
++                SELECT id, name, "order", assigned_apps
++                FROM frames
++                WHERE user_id = $1
++                ORDER BY "order"
++                """,
++                user_id
++            )
++            
++            if not rows:
++                logger.info(f"No frames found for user {user_id}, using defaults")
++                return DEFAULT_FRAMES
++            
++            frames = []
++            for row in rows:
++                # Convert row dict to Frame model
++                frame = Frame(
++                    id=row['id'],
++                    name=row['name'],
++                    order=row['order'],
++                    assignedApps=[AppAssignment(**app) for app in row['assigned_apps']]
++                )
++                frames.append(frame)
++            
++            return frames
++        else:
++            logger.warning(f"Database unavailable. Returning default frames for user {user_id}")
++            return DEFAULT_FRAMES
++    except Exception as e:
++        logger.error(f"Error fetching frames for user {user_id}: {e}", exc_info=True)
++        return DEFAULT_FRAMES
+ 
+ async def save_user_frames(user_id: str, frames: List[Frame]) -> bool:
+     """Stub: Save frames for a user."""
+-    logger.warning(f"STUB: Saving {len(frames)} frames for user {user_id}.")
+-    # TODO: Replace with database transaction to delete old frames and insert new ones for user_id
+-    # For simplicity, just log the input for now
++    if not await db.check_health():
++        logger.warning(f"Database unavailable. Cannot save frames for user {user_id}")
++        return False
++    
+     try:
+-        logger.info(f"Frames data to save: {[frame.model_dump_json(indent=2) for frame in frames]}")
+-        return True # Assume success
++        async with db.get_connection() as conn:
++            # Start a transaction
++            async with conn.transaction():
++                # Delete existing frames for this user
++                await conn.execute(
++                    "DELETE FROM frames WHERE user_id = $1",
++                    user_id
++                )
++                
++                # Insert new frames
++                for frame in frames:
++                    await conn.execute(
++                        """
++                        INSERT INTO frames(id, user_id, name, "order", assigned_apps)
++                        VALUES($1, $2, $3, $4, $5)
++                        """,
++                        frame.id or str(uuid.uuid4()),
++                        user_id,
++                        frame.name,
++                        frame.order,
++                        [app.model_dump() for app in frame.assignedApps]
++                    )
++                
++                logger.info(f"Successfully saved {len(frames)} frames for user {user_id}")
++                return True
+     except Exception as e:
+-        logger.error(f"Error serializing frames for logging: {e}")
+-        return False # Indicate failure
++        logger.error(f"Error saving frames for user {user_id}: {e}", exc_info=True)
++        return False
+ 
+ async def get_available_apps() -> List[AppDefinition]:
+     """Stub: Retrieve list of available apps."""
+-    logger.warning("STUB: Retrieving available apps. Returning default.")
+-    # TODO: Replace with database query or configuration loading
+-    return DEFAULT_AVAILABLE_APPS
++    try:
++        if await db.check_health():
++            rows = await db.execute(
++                """
++                SELECT id, name, scope, module, url
++                FROM available_apps
++                ORDER BY name
++                """
++            )
++            
++            if not rows:
++                logger.info("No apps found in database, using defaults")
++                return DEFAULT_AVAILABLE_APPS
++            
++            apps = []
++            for row in rows:
++                app = AppDefinition(
++                    id=row['id'],
++                    name=row['name'],
++                    scope=row['scope'],
++                    module=row['module'],
++                    url=row['url']
++                )
++                apps.append(app)
++            
++            return apps
++        else:
++            logger.warning("Database unavailable. Returning default apps")
++            return DEFAULT_AVAILABLE_APPS
++    except Exception as e:
++        logger.error(f"Error fetching available apps: {e}", exc_info=True)
++        return DEFAULT_AVAILABLE_APPS
+ 
+ async def get_service_endpoints() -> ServiceEndpoints:
+     """Stub: Retrieve service endpoint configuration."""
+-    logger.warning("STUB: Retrieving service endpoints. Returning default.")
+-    # TODO: Replace with database query or configuration loading
+-    return DEFAULT_ENDPOINTS
++    try:
++        if await db.check_health():
++            row = await db.execute(
++                """
++                SELECT job_config_service_url
++                FROM service_endpoints
++                WHERE id = 'default'
++                """,
++                fetch_type="one"
++            )
++            
++            if not row:
++                logger.info("No service endpoints found in database, using defaults")
++                return DEFAULT_ENDPOINTS
++            
++            return ServiceEndpoints(
++                jobConfigServiceUrl=row['job_config_service_url']
++            )
++        else:
++            logger.warning("Database unavailable. Returning default endpoints")
++            return DEFAULT_ENDPOINTS
++    except Exception as e:
++        logger.error(f"Error fetching service endpoints: {e}", exc_info=True)
++        return DEFAULT_ENDPOINTS
++
++# Additional helper function to initialize the database with default values
++async def initialize_default_data():
++    """Initialize database with default apps and endpoints if they don't exist."""
++    if not await db.check_health():
++        logger.warning("Database unavailable. Cannot initialize default data.")
++        return False
++    
++    # Load default apps
++    for app in DEFAULT_AVAILABLE_APPS:
++        await db.execute(
++            """
++            INSERT INTO available_apps(id, name, scope, module, url)
++            VALUES($1, $2, $3, $4, $5)
++            ON CONFLICT (id) DO NOTHING
++            """,
++            app.id, app.name, app.scope, app.module, app.url,
++            fetch_type="status"
++        )
++    
++    # Load default endpoints
++    await db.execute(
++        """
++        INSERT INTO service_endpoints(id, job_config_service_url)
++        VALUES('default', $1)
++        ON CONFLICT (id) DO UPDATE SET
++            job_config_service_url = $1
++        """,
++        DEFAULT_ENDPOINTS.jobConfigServiceUrl,
++        fetch_type="status"
++    )
++    
++    logger.info("Default data initialized successfully")
++    return True
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/api/routes/shell.py
+TYPE: modify
+DESCRIPTION: Update API route logic to integrate with database
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/shell_service/api/routes/shell.py
++++ b/Users/jim/src/apps/c4h_editor/shell_service/api/routes/shell.py
+@@ -4,49 +4,83 @@
+ and save user preferences.
+ """
+ 
+-from fastapi import APIRouter, HTTPException, Body, Depends
++from fastapi import APIRouter, HTTPException, Body, Depends, Header, Query
+ from typing import List, Dict, Any, Optional
+ import logging
++import uuid
+ 
+-from models.preferences import ( # Assuming models are in ../models/
++# Correct import path for database
++from database import crud
++from models.preferences import (
+     ShellConfigurationResponse,
+     ShellPreferencesRequest,
+     AppDefinition,
+     ServiceEndpoints,
+     Frame
+ )
++# --- API Endpoints ---
+ 
+ # Configure logger
+ logger = logging.getLogger(__name__)
+ 
+ # Create router
+ router = APIRouter(prefix="/api/v1/shell", tags=["shell_preferences"])
+ 
+-# --- Stubbed Data (Replace with database interaction later) ---
+-
+-DEFAULT_AVAILABLE_APPS = [
+-    AppDefinition(id='config-selector', name='Configuration Manager', scope='configSelector', module='./ConfigManager'),
+-    AppDefinition(id='job-management', name='Job Manager', scope='jobManagement', module='./JobManager'),
+-    AppDefinition(id='yaml-editor', name='YAML Editor', scope='yamlEditor', module='./YamlEditor'),
+-]
+-DEFAULT_FRAMES = [ Frame(id='default-configs', name='Configurations', order=0, assignedApps=[{'appId': 'config-selector'}]) ]
+-DEFAULT_ENDPOINTS = ServiceEndpoints(jobConfigServiceUrl="http://localhost:8000") # Default Job/Config service URL
+-
+-# --- API Endpoints ---
++# Simple user extraction from headers (replace with your auth system)
++async def get_current_user(x_user_id: Optional[str] = Header(None)):
++    """Extract user ID from headers or use default."""
++    if not x_user_id:
++        return "anonymous"
++    return x_user_id
+ 
+ @router.get("/configuration", response_model=ShellConfigurationResponse)
+-async def get_shell_configuration():
+-    """Stub: Returns the default shell configuration."""
+-    logger.info("Serving default shell configuration (stub)")
+-    # In real implementation, fetch user-specific frames, available apps, and endpoints
+-    return ShellConfigurationResponse(
+-        frames=DEFAULT_FRAMES,
+-        availableApps=DEFAULT_AVAILABLE_APPS,
+-        serviceEndpoints=DEFAULT_ENDPOINTS
+-    )
++async def get_shell_configuration(user_id: str = Depends(get_current_user)):
++    """
++    Retrieves the complete shell configuration including user frames,
++    available microfrontend apps, and backend service endpoints.
++    """
++    logger.info(f"Fetching shell configuration for user: {user_id}")
++    try:
++        # Fetch data using CRUD functions
++        user_frames = await crud.get_user_frames(user_id)
++        available_apps = await crud.get_available_apps()
++        service_endpoints = await crud.get_service_endpoints()
++
++        return ShellConfigurationResponse(
++            frames=user_frames,
++            availableApps=available_apps,
++            serviceEndpoints=service_endpoints
++        )
++    except Exception as e:
++        logger.error(f"Error fetching shell configuration: {e}", exc_info=True)
++        raise HTTPException(status_code=500, detail="Failed to retrieve shell configuration.")
+ 
+ @router.put("/preferences")
+-async def save_shell_preferences(preferences: ShellPreferencesRequest = Body(...)):
+-    """Stub: Accepts and logs user preferences."""
+-    logger.info(f"Received preferences update (stub): {len(preferences.frames)} frames")
+-    # In real implementation, validate and save preferences to database for the user
+-    # For now, just log and return success
+-    return {"message": "Preferences received (stub implementation)."}
++async def save_shell_preferences(
++    preferences: ShellPreferencesRequest = Body(...),
++    user_id: str = Depends(get_current_user)
++):
++    """Saves the user's frame preferences."""
++    logger.info(f"Saving preferences for user: {user_id} ({len(preferences.frames)} frames)")
++
++    # Validate frame IDs and generate any missing ones
++    for frame in preferences.frames:
++        if not frame.id:
++            frame.id = str(uuid.uuid4())
++            logger.info(f"Generated ID for frame '{frame.name}': {frame.id}")
++
++    try:
++        success = await crud.save_user_frames(user_id, preferences.frames)
++        if not success:
++            raise HTTPException(status_code=500, detail="Failed to save preferences.")
++
++        return {"message": "Preferences saved successfully."}
++    except Exception as e:
++        logger.error(f"Error saving shell preferences: {e}", exc_info=True)
++        # Catch potential validation errors from Pydantic if needed
++        raise HTTPException(status_code=500, detail=f"An error occurred while saving preferences: {str(e)}")
++
++@router.get("/available-apps", response_model=List[AppDefinition])
++async def get_available_apps():
++    """
++    Retrieves the list of available microfrontend apps.
++    This endpoint is optional as the apps are also returned in /configuration.
++    """
++    logger.info("Fetching available apps")
++    try:
++        available_apps = await crud.get_available_apps()
++        return available_apps
++    except Exception as e:
++        logger.error(f"Error fetching available apps: {e}", exc_info=True)
++        raise HTTPException(status_code=500, detail="Failed to retrieve available apps.")
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/main.py
+TYPE: modify
+DESCRIPTION: Update main app with database lifecycle management
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/shell_service/main.py
++++ b/Users/jim/src/apps/c4h_editor/shell_service/main.py
+@@ -3,16 +3,30 @@
+ 
+ import logging
+ import sys
++from contextlib import asynccontextmanager
+ from fastapi import FastAPI
+ from fastapi.middleware.cors import CORSMiddleware
+ 
+ # Assuming routes are in ./api/routes/
+ from api.routes import shell as shell_router
++# Database imports
++from database import db
++from database import crud
+ 
+ # Configure basic logging
+ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+ logger = logging.getLogger(__name__)
+ 
++# --- Lifespan Management for DB Setup/Teardown ---
++@asynccontextmanager
++async def lifespan(app: FastAPI):
++    logger.info("Preferences Shell Service starting up...")
++    # Connect to database
++    await db.connect()
++    # Initialize default data
++    await crud.initialize_default_data()
++    yield
++    # Disconnect from database
++    await db.disconnect()
+ 
+ app = FastAPI(
+     title="C4H Preferences Shell Service",
+@@ -20,7 +34,8 @@
+     version="0.1.0"
+ )
+ 
+-# --- Middleware ---
++# --- Middleware --- 
++
+ # TODO: Configure CORS properly based on deployment needs
+ app.add_middleware(
+     CORSMiddleware,
+@@ -35,5 +50,9 @@
+ 
+ @app.get("/health", tags=["health"])
+ async def health_check():
+-    return {"status": "healthy", "service": "Preferences Shell Service"}
++    # Enhanced health check that includes DB status
++    db_status = await db.check_health()
++    return {
++        "status": "healthy" if db_status else "degraded",
++        "service": "Preferences Shell Service",
++        "database": db_status
++    }
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/scripts/init_prefs_db.py
+TYPE: modify
+DESCRIPTION: Implement database initialization script
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/shell_service/scripts/init_prefs_db.py
++++ b/Users/jim/src/apps/c4h_editor/shell_service/scripts/init_prefs_db.py
+@@ -1,21 +1,116 @@
+ """
+-Placeholder script to initialize the preferences database with default data.
+-
+-This script would typically:
+-1. Connect to the database.
+-2. Check if default data (e.g., available apps) already exists.
+-3. If not, load defaults from ../data/defaults.json.
+-4. Insert default available_apps into the database.
+-5. Optionally insert default frames for a system user or as a template.
++Script to initialize the preferences database with default data.
++This creates tables and populates them with default data from defaults.json.
+ """
+ 
+ import asyncio
+ import logging
++import json
++import sys
++from pathlib import Path
++
++# Adjust the path to import from parent directory
++sys.path.insert(0, str(Path(__file__).parent.parent))
++
++from database import db
++from models.preferences import AppDefinition, ServiceEndpoints
+ 
+ # Configure logger
+ logging.basicConfig(level=logging.INFO)
+ logger = logging.getLogger(__name__)
+ 
++# Path to SQL schema file
++SCHEMA_FILE = Path(__file__).parent.parent / "database" / "schema.sql"
++
++# Path to default data
++DEFAULT_DATA_PATH = Path(__file__).parent.parent / "data" / "defaults.json"
++
++async def read_schema_file() -> str:
++    """Read the schema file content."""
++    try:
++        with open(SCHEMA_FILE, 'r') as f:
++            return f.read()
++    except FileNotFoundError:
++        logger.error(f"Schema file not found at {SCHEMA_FILE}")
++        raise
++
++async def load_default_data():
++    """Load default data from the JSON file."""
++    try:
++        with open(DEFAULT_DATA_PATH, 'r') as f:
++            return json.load(f)
++    except FileNotFoundError:
++        logger.error(f"Default data file not found at {DEFAULT_DATA_PATH}")
++        raise
++    except json.JSONDecodeError:
++        logger.error(f"Error decoding JSON from {DEFAULT_DATA_PATH}")
++        raise
++
++async def create_schema():
++    """Create database schema."""
++    try:
++        schema_sql = await read_schema_file()
++        logger.info("Creating database schema...")
++        
++        # Execute schema SQL
++        await db.execute(schema_sql, fetch_type="status")
++        logger.info("Schema created successfully")
++        return True
++    except Exception as e:
++        logger.error(f"Error creating schema: {e}", exc_info=True)
++        return False
++
++async def populate_default_apps(available_apps):
++    """Populate default available apps."""
++    try:
++        logger.info(f"Populating {len(available_apps)} default apps")
++        
++        for app_data in available_apps:
++            app = AppDefinition(**app_data)
++            
++            # Check if app already exists
++            existing = await db.execute(
++                "SELECT id FROM available_apps WHERE id = $1",
++                app.id,
++                fetch_type="val"
++            )
++            
++            if existing:
++                logger.info(f"App {app.id} already exists, updating")
++                await db.execute(
++                    """
++                    UPDATE available_apps
++                    SET name = $2, scope = $3, module = $4, url = $5, updated_at = CURRENT_TIMESTAMP
++                    WHERE id = $1
++                    """,
++                    app.id, app.name, app.scope, app.module, app.url,
++                    fetch_type="status"
++                )
++            else:
++                logger.info(f"Adding new app {app.id}")
++                await db.execute(
++                    """
++                    INSERT INTO available_apps(id, name, scope, module, url)
++                    VALUES($1, $2, $3, $4, $5)
++                    """,
++                    app.id, app.name, app.scope, app.module, app.url,
++                    fetch_type="status"
++                )
++                
++        return True
++    except Exception as e:
++        logger.error(f"Error populating default apps: {e}", exc_info=True)
++        return False
++
++async def populate_default_endpoints(endpoints_data):
++    """Populate default service endpoints."""
++    try:
++        logger.info("Setting up default service endpoints")
++        endpoints = ServiceEndpoints(**endpoints_data)
++        
++        # Check if default endpoints exist
++        existing = await db.execute(
++            "SELECT id FROM service_endpoints WHERE id = 'default'",
++            fetch_type="val"
++        )
++        
++        if existing:
++            logger.info("Default endpoints already exist, updating")
++            await db.execute(
++                """
++                UPDATE service_endpoints
++                SET job_config_service_url = $1, updated_at = CURRENT_TIMESTAMP
++                WHERE id = 'default'
++                """,
++                endpoints.jobConfigServiceUrl,
++                fetch_type="status"
++            )
++        else:
++            logger.info("Adding default endpoints")
++            await db.execute(
++                """
++                INSERT INTO service_endpoints(id, job_config_service_url)
++                VALUES('default', $1)
++                """,
++                endpoints.jobConfigServiceUrl,
++                fetch_type="status"
++            )
++                
++        return True
++    except Exception as e:
++        logger.error(f"Error populating default endpoints: {e}", exc_info=True)
++        return False
++
+ async def initialize_database():
+-    logger.warning("STUB: Database initialization script needs implementation.")
+-    # TODO: Implement database connection and data insertion logic here.
+-    # Example: await crud.insert_default_apps_if_needed()
++    """Initialize the database with schema and default data."""
++    try:
++        # Connect to the database
++        connected = await db.connect()
++        if not connected:
++            logger.error("Failed to connect to database. Exiting.")
++            return False
++        
++        # Create schema
++        if not await create_schema():
++            return False
++        
++        # Load default data
++        default_data = await load_default_data()
++        
++        # Populate default apps
++        if not await populate_default_apps(default_data.get("availableApps", [])):
++            return False
++        
++        # Populate default endpoints
++        if not await populate_default_endpoints(default_data.get("defaultEndpoints", {})):
++            return False
++        
++        logger.info("Database initialization completed successfully")
++        return True
++    except Exception as e:
++        logger.error(f"Database initialization failed: {e}", exc_info=True)
++        return False
++    finally:
++        await db.disconnect()
++
++if __name__ == "__main__":
++    asyncio.run(initialize_database())
+===CHANGE_END===

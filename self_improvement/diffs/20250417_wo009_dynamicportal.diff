@@ -1,0 +1,164 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/preferences/PreferencesDialog.tsx
+TYPE: modify
+DESCRIPTION: Implement Frame list display and reordering logic in PreferencesDialog.
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/preferences/PreferencesDialog.tsx
++++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/preferences/PreferencesDialog.tsx
+@@ -1,4 +1,4 @@
+-import React, { useState, useEffect } from 'react';
++import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
+ import {
+     Dialog,
+     DialogTitle,
+@@ -9,13 +9,21 @@
+     IconButton,
+     Typography,
+     Box,
++    List, // Added List components
++    ListItem,
++    ListItemText,
++    ListItemIcon, // For icons
+     CircularProgress,
+     Alert
+ } from '@mui/material';
+ import CloseIcon from '@mui/icons-material/Close';
+-import { useShellConfig } from '../../contexts/ShellConfigContext'; // Adjust path if needed
+-// Import necessary types (will be needed for implementation)
+-// import { Frame, AppDefinition, AppAssignment } from 'shared';
++import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'; // Added icons
++import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
++import DragHandleIcon from '@mui/icons-material/DragHandle'; // Optional drag handle
++
++import { useShellConfig } from '../../contexts/ShellConfigContext';
++import { Frame, ShellPreferencesRequest, apiService } from 'shared'; // Import needed types and apiService
+ 
+ interface PreferencesDialogProps {
+   open: boolean;
+@@ -23,21 +31,64 @@
+ }
+ 
+ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) => {
+-  const {config, loading: configLoading, error: configError } = useShellConfig();
++  // Get config and fetch function from context
++  const { config, loading: configLoading, error: configError, fetchConfig } = useShellConfig();
+   const [isSaving, setIsSaving] = useState(false);
+   const [saveError, setSaveError] = useState<string | null>(null);
++  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+ 
+-  // TODO: Add state management for edited frames
++  // Local state to manage the list of frames being edited
++  const [editedFrames, setEditedFrames] = useState<Frame[]>([]);
++
++  // Initialize local state when the dialog opens or config changes
++  useEffect(() => {
++    if (open && config?.frames) {
++      // Create a deep copy sorted by order to edit locally
++      const sortedFrames = [...config.frames]
++                             .sort((a, b) => a.order - b.order)
++                             // Ensure assignedApps is copied correctly if it contains objects
++                             .map(f => ({ ...f, assignedApps: [...(f.assignedApps || [])] }));
++      setEditedFrames(sortedFrames);
++      setSaveError(null); // Reset errors when dialog opens/re-initializes
++      setSuccessMessage(null);
++    } else if (!open) {
++        // Reset state when dialog closes
++        setEditedFrames([]);
++    }
++  }, [open, config?.frames]); // Depend on open state and frames data
++
++  const handleMoveFrame = useCallback((index: number, direction: 'up' | 'down') => {
++    setEditedFrames(currentFrames => {
++      const newFrames = [...currentFrames];
++      const targetIndex = direction === 'up' ? index - 1 : index + 1;
++
++      if (targetIndex < 0 || targetIndex >= newFrames.length) {
++        return currentFrames; // Cannot move further
++      }
++
++      // Swap elements
++      [newFrames[index], newFrames[targetIndex]] = [newFrames[targetIndex], newFrames[index]];
++
++      // Update order property based on new position
++      return newFrames.map((frame, idx) => ({ ...frame, order: idx }));
++    });
++  }, []);
+ 
+   const handleSave = async () => {
+     setIsSaving(true);
+     setSaveError(null);
+-    console.log("TODO: Implement save logic");
+-    // TODO: Call apiService.saveShellPreferences with edited frames data
+-    // TODO: Handle success (maybe refresh context config?) and close, or show error
+-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate save
+-    setIsSaving(false);
+-    // onClose(); // Close on successful save
++    setSuccessMessage(null);
++    try {
++        const payload: ShellPreferencesRequest = { frames: editedFrames };
++        const response = await apiService.saveShellPreferences(payload);
++        setSuccessMessage(response.message || 'Preferences saved successfully!');
++        await fetchConfig(); // Refresh the main config context
++        // Close dialog after a short delay to show success
++        setTimeout(() => { onClose(); }, 1500);
++    } catch (err: any) {
++        const errorDetail = err.response?.data?.detail || err.message || 'Failed to save preferences.';
++        setSaveError(errorDetail);
++        console.error("Error saving preferences:", err);
++    } finally {
++        setIsSaving(false);
++    }
+   };
+ 
+   return (
+@@ -47,16 +98,40 @@
+         <IconButton onClick={onClose}><CloseIcon /></IconButton>
+       </DialogTitle>
+       <DialogContent dividers>
+-        <Typography>Preferences Management UI (WO9 - TODO)</Typography>
+-        {/* TODO: Implement FrameList and AppAssignmentEditor components here */}
+         {configLoading && <CircularProgress />}
+         {configError && <Alert severity="warning">Could not load initial config: {configError}</Alert>}
++        {successMessage && <Alert severity="success" sx={{ mb: 2 }}>{successMessage}</Alert>}
+         {saveError && <Alert severity="error" sx={{ mt: 2 }}>{saveError}</Alert>}
+-        {/* Placeholder content */}
+-        <Box sx={{ minHeight: '400px', mt: 2, border: '1px dashed grey', p: 2 }}>
+-           Frame List & App Assignment UI will go here...
+-        </Box>
++
++        {!configLoading && !configError && (
++             <Box>
++                 <Typography variant="h6" gutterBottom>Manage Frames (Tabs)</Typography>
++                 <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>
++                    Define the tabs visible in the sidebar and their order. App assignment will be added later.
++                 </Typography>
++                 <List>
++                     {editedFrames.map((frame, index) => (
++                         <ListItem
++                             key={frame.id || `frame-${index}`} // Use index as fallback key for unsaved new frames
++                             secondaryAction={
++                                 <>
++                                     <IconButton size="small" onClick={() => handleMoveFrame(index, 'up')} disabled={index === 0 || isSaving}>
++                                         <ArrowUpwardIcon fontSize="inherit" />
++                                     </IconButton>
++                                     <IconButton size="small" onClick={() => handleMoveFrame(index, 'down')} disabled={index === editedFrames.length - 1 || isSaving}>
++                                         <ArrowDownwardIcon fontSize="inherit" />
++                                     </IconButton>
++                                     {/* TODO: Add Edit/Delete buttons later */}
++                                 </>
++                             }
++                             sx={{ borderBottom: 1, borderColor: 'divider', '&:last-child': { borderBottom: 0 } }}
++                         >
++                             <ListItemIcon sx={{ minWidth: '30px', cursor: 'grab' }}><DragHandleIcon fontSize='small' /></ListItemIcon> {/* Optional Drag Handle */}
++                             <ListItemText primary={frame.name} secondary={`ID: ${frame.id}`} />
++                         </ListItem>
++                     ))}
++                 </List>
++                 {/* TODO: Add 'Create New Frame' button later */}
++             </Box>
++        )}
+       </DialogContent>
+       <DialogActions>
+         <Button onClick={onClose} disabled={isSaving}>Cancel</Button>
+
+===CHANGE_END===

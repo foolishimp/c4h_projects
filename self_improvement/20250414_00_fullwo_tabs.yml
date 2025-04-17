@@ -1,0 +1,341 @@
+# Work Order 1: Define & Stub Preferences Shell Service API & Models
+
+project:
+  path: "/Users/jim/src/apps/c4h_editor/shell_service" 
+  workspace_root: "workspaces/WO1_PrefsServiceAPI"
+
+intent:
+  description: |
+    # WO-1: Define & Stub Preferences Shell Service API & Models
+
+    ## Goal
+    Establish the API contract and basic structure for the new Preferences Shell Service. This service will act as a Backend-for-Frontend (BFF) managing UI preferences for the C4H Editor Frontend Shell.
+
+    ## Required Changes
+    1.  **API Definition:** Define OpenAPI specifications for endpoints: `GET /api/v1/shell/configuration`, `PUT /api/v1/shell/preferences`, `GET /api/v1/shell/available-apps` (optional).
+    2.  **Data Models:** Define Pydantic models for: `Frame`, `AppAssignment`, `AppDefinition`, `ShellConfigurationResponse`.
+    3.  **Service Framework:** Set up the basic FastAPI framework for the new Preferences Shell Service.
+    4.  **Stub Endpoints:** Implement stubbed endpoints returning default/empty responses.
+    5.  **Database Schema:** Define the initial database schema (e.g., PostgreSQL/MongoDB) for storing preferences.
+
+    ## Design Principles to Follow
+    * Adhere to API design principles (`c4h_api_doc_v1.md`).
+    * Ensure clear, validated data models (Pydantic).
+
+    ## Files to Create
+    * New directory: `/Users/jim/src/apps/c4h_editor/shell_service`
+    * Within the new service: `api/routes/shell.py`, `models/preferences.py`, `main.py`, `database/schema.sql` (or equivalent).
+
+  # LLM configuration (Optional - Add this section back ONLY for local overrides)
+  # llm_config:
+  #   default_provider: "anthropic"
+  #   default_model: "claude-3-5-sonnet-20241022"
+  #   agents:
+  #     discovery: { model: "claude-3-haiku-20240307" } # Example override
+  #     solution_designer: { provider: "openai", model: "gpt-4o" } # Example override
+
+---
+# Work Order 2: Finalize & Document Job/Config & C4H Service API Contracts
+
+project:
+  path: "/Users/jim/src/apps/c4h_editor/backend" 
+  workspace_root: "workspaces/WO2_APIContracts"
+
+intent:
+  description: |
+    # WO-2: Finalize & Document Job/Config & C4H Service API Contracts
+
+    ## Goal
+    Ensure clear, consistent, documented API contracts for job submission/status between the Job/Config Service and the C4H Service.
+
+    ## Required Changes
+    1.  **Review Job/Config Service API:** Validate/update OpenAPI spec, confirm `POST /api/v1/jobs/multi-config` expects `JobListRequest` (`{"configurations": JobConfigReference[]}`).
+    2.  **Review C4H Service API:** Validate/update OpenAPI spec, confirm `POST /api/v1/jobs` accepts `MultiConfigJobRequest` (`{"configs": object[]}`).
+    3.  **Document Mapping:** Document the transformation from `JobListRequest` to `MultiConfigJobRequest` in `c4h_api_doc_v1.md`.
+    4.  **Update API Documentation:** Modify `c4h_api_doc_v1.md` to reflect finalized models/endpoints.
+
+    ## Files to Modify
+    * `/Users/jim/src/apps/c4h_editor/backend/api/routes/jobs.py` (Potentially models)
+    * `/Users/jim/src/apps/c4h_projects/docs/design_docs/c4h_api_doc_v1.md`
+    * (Potentially) OpenAPI specification files.
+
+  # LLM configuration (Optional - Add this section back ONLY for local overrides)
+
+---
+# Work Order 3: Implement Preferences Shell Service Logic & Persistence
+
+project:
+  path: "/Users/jim/src/apps/c4h_editor/shell_service" 
+  workspace_root: "workspaces/WO3_PrefsServiceLogic"
+
+intent:
+  description: |
+    # WO-3: Implement Preferences Shell Service Logic & Persistence
+
+    ## Goal
+    Build the functional backend logic for the Preferences Shell Service (defined in WO-1), enabling storage and retrieval of UI configuration data.
+
+    ## Required Changes
+    1.  **Database Implementation:** Implement schema (WO-1), connection handling, and CRUD functions for `Frame`, `AppDefinition`, `ServiceEndpoint`.
+    2.  **API Endpoint Logic:** Implement full logic for `GET /api/v1/shell/configuration` (fetch all data) and `PUT /api/v1/shell/preferences` (validate & update).
+    3.  **Default Data Population:** Implement a mechanism (e.g., startup script) to populate default Frames, AppDefinitions (for existing microfrontends), and Job/Config service URL.
+    4.  **Testing:** Write unit/integration tests for DB operations, API logic, default data, and error handling.
+
+    ## Design Principles to Follow
+    * Secure and efficient DB interactions.
+    * Proper error handling and logging.
+    * Validate incoming data.
+
+    ## Files to Create/Modify (within the new service path)
+    * `database.py`
+    * `api/routes/shell.py`
+    * `main.py`
+    * `tests/`
+    * `data/defaults.json`
+    * `scripts/init_prefs_db.py`
+
+  # LLM configuration (Optional - Add this section back ONLY for local overrides)
+
+---
+# Work Order 4: Refactor Job/Config Service & C4H Client
+
+project:
+  path: "/Users/jim/src/apps/c4h_editor/backend" 
+  workspace_root: "workspaces/WO4_JobConfigRefactor"
+
+intent:
+  description: |
+    # WO-4: Refactor Job/Config Service & C4H Client
+
+    ## Goal
+    Refactor the Job/Config Service (existing backend) to remove UI logic and ensure correct `{"configs": [...]}` payload interaction with the C4H Service.
+
+    ## Required Changes
+    1.  **Remove UI/Preference Logic:** Eliminate code managing shell layout, UI preferences, etc.
+    2.  **Update Job Submission Endpoint:** Refactor `POST /api/v1/jobs/multi-config` to expect `JobListRequest` and pass references correctly.
+    3.  **Update Background Submission Task:** Modify `submit_multi_configs` to load config *content* based on references and create `config_list_for_service` containing only content objects for the C4H client.
+    4.  **Verify C4H Service Client:** Ensure `submit_job_with_configs` in `services/c4h_service.py` wraps the content list correctly: `{"configs": config_list_for_service}`.
+    5.  **Update Tests:** Refactor/add tests for endpoint input, background task logic, client payload format, and config CRUD.
+
+    ## Design Principles to Follow
+    * Maintain separation of concerns.
+    * Robust error handling.
+    * Adhere to finalized API contracts (WO-2).
+
+    ## Files to Modify
+    * `api/routes/jobs.py`
+    * `services/c4h_service.py`
+    * Other service/repository files if they contain UI logic.
+    * Relevant test files.
+
+  # LLM configuration (Optional - Add this section back ONLY for local overrides)
+
+---
+# Work Order 5: Implement Shell Service Discovery & Dynamic API Configuration
+
+project:
+  path: "/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell" 
+  workspace_root: "workspaces/WO5_ShellDiscovery"
+
+intent:
+  description: |
+    # WO-5: Implement Shell Service Discovery & Dynamic API Configuration
+
+    ## Goal
+    Modify the Frontend Shell startup to fetch configuration (layout, apps, endpoints) from the Preferences Shell Service and dynamically configure its shared `apiService`.
+
+    ## Required Changes
+    1.  **Fetch Configuration on Startup:** Call `GET /api/v1/shell/configuration` (Preferences Service) before rendering main UI in `src/App.tsx`. Show loading state.
+    2.  **State Management Integration:** Store the fetched `ShellConfigurationResponse` in Shell state (React Context).
+    3.  **Dynamic apiService Configuration:** Modify `packages/shared/src/services/apiService.ts` to accept a dynamic base URL. Call its config function from Shell startup using the fetched `jobConfigServiceUrl`.
+    4.  **Error Handling:** Implement fallback to default configuration (frames, apps, Job/Config URL) if Preferences Service call fails. Log warning/notify user.
+    5.  **Testing:** Test fetching, state update, `apiService` configuration, and fallback mechanisms.
+
+    ## Design Principles to Follow
+    * Decouple frontend from backend locations.
+    * Correct async loading patterns.
+    * Functional UI fallback on error.
+    * Follow TypeScript Design Principles.
+
+    ## Files to Modify
+    * `src/App.tsx`
+    * `src/index.tsx` (Potentially)
+    * `packages/shared/src/services/apiService.ts`
+    * `src/contexts/ShellConfigContext.tsx` (New/existing)
+    * `src/config/defaults.ts` (New)
+    * Relevant test files.
+
+  # LLM configuration (Optional - Add this section back ONLY for local overrides)
+
+---
+# Work Order 6: Implement Dynamic Frame (Tab) Rendering in Shell
+
+project:
+  path: "/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell" 
+  workspace_root: "workspaces/WO6_DynamicFrames"
+
+intent:
+  description: |
+    # WO-6: Implement Dynamic Frame (Tab) Rendering in Shell
+
+    ## Goal
+    Replace static sidebar in the Frontend Shell with a dynamic tab bar driven by Frame preferences (fetched in WO-5).
+
+    ## Required Changes
+    1.  **Remove Static Layout:** Remove `src/components/common/Navigation.tsx` and associated layout in `src/App.tsx`.
+    2.  **Implement Tab Bar Component:** Create a new `TabBar` component (using Material UI `Tabs`/`Tab`).
+    3.  **Dynamic Tab Rendering:** In `App.tsx`, render `Tab`s dynamically based on `frames` from Shell state, sorted by `order`, using `frame.name` for labels.
+    4.  **Active Tab State Management:** Track the active Frame `id` in state; update on click; visually indicate active tab.
+    5.  **Content Area Preparation:** Ensure content area is ready for dynamic app loading (WO-7).
+
+    ## Design Principles to Follow
+    * Responsive design.
+    * Clear active tab indication.
+    * Adhere to Material UI and TypeScript Design Principles.
+
+    ## Files to Modify
+    * `src/App.tsx`
+    * `src/components/common/Navigation.tsx` (Delete)
+    * `src/components/layout/TabBar.tsx` (New)
+    * `src/contexts/ShellConfigContext.tsx` (Or similar state management)
+    * Relevant CSS/styling files.
+    * Relevant test files.
+
+  # LLM configuration (Optional - Add this section back ONLY for local overrides)
+
+---
+# Work Order 7: Implement Dynamic Microfrontend App Loading
+
+project:
+  path: "/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell" 
+  workspace_root: "workspaces/WO7_DynamicLoading"
+
+intent:
+  description: |
+    # WO-7: Implement Dynamic Microfrontend App Loading
+
+    ## Goal
+    Enable the Frontend Shell to dynamically load and display microfrontend app(s) based on the active Frame tab, using Module Federation.
+
+    ## Required Changes
+    1.  **Identify Active Frame's Apps:** Get `assignedApps` array for the active Frame from Shell state.
+    2.  **Retrieve App Definitions:** Look up full `AppDefinition` (`scope`, `module`, `url`) for each `appId` using `availableApps` from Shell state.
+    3.  **Dynamic Loading Logic:** In Shell content area (`src/App.tsx`), conditionally render assigned app(s). Use `RemoteComponent` loader (`packages/shared/src/components/RemoteComponent.tsx`) with `scope`, `module`, `url`. Wrap in `React.lazy` and `React.Suspense` with loading indicator.
+    4.  **Props/Context Passing:** Ensure loaded microfrontends receive necessary context (e.g., `apiService`).
+    5.  **Layout Handling (Basic):** Render only one assigned app per Frame initially.
+    6.  **Error Handling:** Use React Error Boundaries around dynamic loading.
+
+    ## Design Principles to Follow
+    * Effective use of Module Federation, Suspense, Error Boundaries.
+    * Ensure apps get required context.
+    * Adhere to TypeScript Design Principles.
+
+    ## Files to Modify
+    * `src/App.tsx`
+    * `packages/shared/src/components/RemoteComponent.tsx` (Verify/Update)
+    * `src/contexts/ShellConfigContext.tsx`
+    * Relevant test files.
+
+  # LLM configuration (Optional - Add this section back ONLY for local overrides)
+
+---
+# Work Order 8: Verify/Update Microfrontend API Usage
+
+project:
+  path: "/Users/jim/src/apps/c4h_editor/c4h-micro" 
+  workspace_root: "workspaces/WO8_MicrofrontendAPI"
+
+intent:
+  description: |
+    # WO-8: Verify/Update Microfrontend API Usage
+
+    ## Goal
+    Ensure microfrontends (`config-selector`, `job-management`, `yaml-editor`) consistently use the shared, dynamically configured `apiService` and remove hardcoded endpoints.
+
+    ## Required Changes
+    1.  **Review `config-selector`:** Verify components/context (`packages/config-selector/src/**`) use imported `apiService` for all backend calls. Remove direct `axios`/hardcoded URLs.
+    2.  **Review `job-management`:** Verify components/context (`packages/job-management/src/**`) use imported `apiService`. Remove direct `axios`/hardcoded URLs.
+    3.  **Review `yaml-editor`:** Confirm (`packages/yaml-editor/src/**`) primarily uses props. Refactor any direct API calls to parent via props/callbacks.
+    4.  **Testing:** Test core functionality of each microfrontend *after* being loaded by the refactored Shell (WO-7).
+
+    ## Design Principles to Follow
+    * Enforce single, shared `apiService`.
+    * Separation of UI logic and API details.
+    * Adhere to TypeScript Design Principles.
+
+    ## Files to Modify (Potentially)
+    * Files within `packages/config-selector/src/`
+    * Files within `packages/job-management/src/`
+    * Files within `packages/yaml-editor/src/`
+    * Relevant test files for each microfrontend.
+
+  # LLM configuration (Optional - Add this section back ONLY for local overrides)
+
+---
+# Work Order 9: Implement Preferences Management UI in Shell
+
+project:
+  path: "/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell" 
+  workspace_root: "workspaces/WO9_PrefsUI"
+
+intent:
+  description: |
+    # WO-9: Implement Preferences Management UI in Shell
+
+    ## Goal
+    Create a UI within the Frontend Shell for users to manage Frames and App assignments via the Preferences Shell Service.
+
+    ## Required Changes
+    1.  **Create Preferences UI Component:** Implement new component (e.g., `src/components/preferences/PreferencesDialog.tsx`), accessible via settings icon.
+    2.  **Display Current Preferences:** UI should show current `frames` and `availableApps` from Shell state. Allow Frame reordering. Show assigned Apps per Frame.
+    3.  **Frame Management (CRUD):** Implement UI for Create, Rename, Delete (with confirmation), Reorder Frames.
+    4.  **App Assignment Management:** Implement UI to Assign/Unassign `availableApps` to Frames.
+    5.  **Save Preferences:** Implement "Save" action calling `PUT /api/v1/shell/preferences` (Preferences Service) with updated `frames` data.
+    6.  **Update Shell State:** On successful save, update Shell's local configuration state to reflect changes dynamically.
+    7.  **Error Handling:** Implement feedback for save success/failure.
+
+    ## Design Principles to Follow
+    * Intuitive UI for preference management.
+    * Clear reflection of UI state changes before save.
+    * Input validation.
+    * Adhere to Material UI and TypeScript Design Principles.
+
+    ## Files to Create/Modify
+    * `src/components/preferences/PreferencesDialog.tsx` (New)
+    * `src/components/preferences/FrameList.tsx` (New)
+    * `src/components/preferences/AppAssignmentEditor.tsx` (New)
+    * `src/App.tsx` (Add trigger)
+    * `src/contexts/ShellConfigContext.tsx` (Add update actions)
+    * `packages/shared/src/services/apiService.ts` (Potentially add PUT helper)
+    * Relevant test files.
+
+  # LLM configuration (Optional - Add this section back ONLY for local overrides)
+
+---
+# Work Order 10: End-to-End Testing, Refinement & Documentation
+
+project:
+  path: "/Users/jim/src/apps/c4h_editor" 
+  workspace_root: "workspaces/WO10_E2E_Testing"
+
+intent:
+  description: |
+    # WO-10: End-to-End Testing, Refinement & Documentation
+
+    ## Goal
+    Conduct E2E testing of the refactored Dynamic Portal Shell architecture, refine implementation, and update documentation.
+
+    ## Required Changes / Tasks
+    1.  **Develop E2E Test Scenarios:** Define key user flows (Shell startup, preference management, dynamic app loading, config management, job management).
+    2.  **Execute E2E Tests:** Run scenarios manually or via framework.
+    3.  **Bug Fixing & Refinement:** Fix bugs, UI issues, performance problems across all components (Frontend Shell, Preferences Shell Service, Job/Config Service, Microfrontends).
+    4.  **Update Documentation:** Revise READMEs, `c4h_api_doc_v1.md`, `Dynamic_Portal_Shell_Architecture.md`. Add/update local development setup instructions. Ensure code comments are accurate.
+
+    ## Files to Modify/Create
+    * Potentially any file within `/Users/jim/src/apps/c4h_editor/c4h-micro`, `/Users/jim/src/apps/c4h_editor/backend`, `/Users/jim/src/apps/c4h_editor/shell_service`.
+    * `/Users/jim/src/apps/c4h_projects/docs/design_docs/Dynamic_Portal_Shell_Architecture.md`
+    * `/Users/jim/src/apps/c4h_projects/docs/design_docs/c4h_api_doc_v1.md`
+    * `README.md` files.
+    * E2E test script files (if using framework).
+
+  # LLM configuration (Optional - Add this section back ONLY for local overrides)

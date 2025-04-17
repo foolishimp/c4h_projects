@@ -1,0 +1,322 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/common/Navigation.tsx
+TYPE: delete
+DESCRIPTION: Remove obsolete static Navigation component.
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/common/Navigation.tsx
++++ /dev/null
+@@ -1,114 +0,0 @@
+-// File: /packages/shell/src/components/common/Navigation.tsx
+-import React from 'react';
+-import { Link, useLocation } from 'react-router-dom';
+-import {
+-  Drawer,
+-  AppBar,
+-  Toolbar,
+-  Box,
+-  Typography,
+-  List,
+-  ListItem,
+-  ListItemButton,
+-  ListItemIcon,
+-  ListItemText,
+-  Divider
+-} from '@mui/material';
+-import {
+-  Description as DescriptionIcon,
+-  Group as GroupIcon,
+-  Settings as SettingsIcon,
+-  Work as WorkIcon,
+-  Add as AddIcon
+-} from '@mui/icons-material';
+-import { configTypes } from 'shared';
+-
+-interface NavigationProps {
+-  drawerWidth: number;
+-}
+-
+-const Navigation: React.FC<NavigationProps> = ({ drawerWidth }) => {
+-  const location = useLocation();
+-
+-  // Function to determine if a path is active
+-  const isActive = (path: string): boolean => {
+-    return location.pathname.startsWith(path);
+-  };
+-
+-  // Function to get an icon for a config type
+-  const getConfigTypeIcon = (configType: string) => {
+-    switch (configType) {
+-      case 'workorder':
+-        return <DescriptionIcon />;
+-      case 'teamconfig':
+-        return <GroupIcon />;
+-      case 'runtimeconfig':
+-        return <SettingsIcon />;
+-      default:
+-        return <DescriptionIcon />;
+-    }
+-  };
+-
+-  return (
+-    <>
+-      {/* App Bar */}
+-      <AppBar
+-        position="fixed"
+-        sx={{
+-          width: { sm: `calc(100% - ${drawerWidth}px)` },
+-          ml: { sm: `${drawerWidth}px` },
+-        }}
+-      >
+-        <Toolbar>
+-          <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+-            <Typography variant="h5" noWrap component="div">
+-              Visual Prompt Studio
+-            </Typography>
+-            <Typography variant="subtitle1" noWrap component="div">
+-              C4H Editor
+-            </Typography>
+-          </Box>
+-        </Toolbar>
+-      </AppBar>
+-
+-      {/* Navigation Drawer */}
+-      <Drawer
+-        variant="permanent"
+-        sx={{
+-          width: drawerWidth,
+-          flexShrink: 0,
+-          [`& .MuiDrawer-paper`]: {
+-            width: drawerWidth,
+-            boxSizing: 'border-box',
+-            marginTop: '64px' // Adjust based on AppBar height
+-          },
+-        }}
+-      >
+-        <Box
+-          sx={{
+-            width: drawerWidth,
+-            flexShrink: 0,
+-            '& .MuiDrawer-paper': {
+-              width: drawerWidth,
+-              boxSizing: 'border-box',
+-            },
+-          }}
+-        >
+-          <List>
+-            {/* Config type navigation */}
+-            {Object.entries(configTypes).map(([type, config]) => (
+-              <ListItem key={type} disablePadding>
+-                <ListItemButton
+-                  component={Link}
+-                  to={`/configs/${type}`}
+-                  selected={isActive(`/configs/${type}`)}
+-                >
+-                  <ListItemIcon>
+-                    {getConfigTypeIcon(type)}
+-                  </ListItemIcon>
+-                  <ListItemText primary={config.name} />
+-                </ListItemButton>
+-              </ListItem>
+-            ))}
+-
+-            {/* Add new config dropdown */}
+-            <ListItem disablePadding>
+-              <ListItemButton
+-                component={Link}
+-                to="/configs/create"
+-                selected={isActive('/configs/create')}
+-              >
+-                <ListItemIcon>
+-                  <AddIcon />
+-                </ListItemIcon>
+-                <ListItemText primary="Create New" />
+-              </ListItemButton>
+-            </ListItem>
+-
+-            <Divider sx={{ my: 1 }} />
+-
+-            {/* Jobs navigation */}
+-            <ListItem disablePadding>
+-              <ListItemButton
+-                component={Link}
+-                to="/jobs"
+-                selected={isActive('/jobs')}
+-              >
+-                <ListItemIcon>
+-                  <WorkIcon />
+-                </ListItemIcon>
+-                <ListItemText primary="Jobs" />
+-              </ListItemButton>
+-            </ListItem>
+-          </List>
+-        </Box>
+-      </Drawer>
+-    </>
+-  );
+-};
+-
+-export default Navigation;
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/layout/TabBar.tsx
+TYPE: create
+DESCRIPTION: Create TabBar component to render dynamic frame tabs.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/layout/TabBar.tsx
+@@ -0,0 +1,36 @@
++import React from 'react';
++import { Tabs, Tab, Box, AppBar, Toolbar, Typography } from '@mui/material';
++import { Frame } from 'shared'; // Assuming Frame type is exported from shared
++
++interface TabBarProps {
++  frames: Frame[];
++  activeFrameId: string | null;
++  onTabChange: (event: React.SyntheticEvent, newFrameId: string) => void;
++}
++
++const TabBar: React.FC<TabBarProps> = ({ frames, activeFrameId, onTabChange }) => {
++  // Sort frames by order property
++  const sortedFrames = React.useMemo(() => {
++    return [...frames].sort((a, b) => a.order - b.order);
++  }, [frames]);
++
++  return (
++    <AppBar position="static" color="default" elevation={1}>
++        {/* Use AppBar position="static" if placing below the main AppBar */}
++        {/* Or integrate directly into the main AppBar's Toolbar */}
++      <Toolbar variant="dense" sx={{ minHeight: '48px', borderBottom: 1, borderColor: 'divider' }}>
++        <Tabs
++          value={activeFrameId || false} // Handle null case for value; false prevents MUI error if no tabs initially
++          onChange={onTabChange}
++          aria-label="Workspace Frames"
++          variant="scrollable"
++          scrollButtons="auto"
++        >
++          {sortedFrames.map((frame) => (
++            <Tab key={frame.id} label={frame.name} value={frame.id} />
++          ))}
++        </Tabs>
++      </Toolbar>
++    </AppBar>
++  );
++};
++
++export default TabBar;
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
+TYPE: modify
+DESCRIPTION: Replace static sidebar with dynamic TabBar based on shell config context. Manage active frame state.
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
++++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
+@@ -1,9 +1,12 @@
+-import React, { useEffect } from 'react'; // Removed unused: Suspense, lazy, useContext
++// Added useState
++import React, { useEffect, useState } from 'react';
+ import { ThemeProvider, CssBaseline, Box, CircularProgress, Typography, AppBar, Toolbar } from '@mui/material'; // Added AppBar, Toolbar
+ import { createTheme } from '@mui/material/styles';
+ import { BrowserRouter as Router } from 'react-router-dom';
+ 
+ import { useShellConfig, ShellConfigProvider } from './contexts/ShellConfigContext';
++import TabBar from './components/layout/TabBar'; // Import the new TabBar
++import { Frame } from 'shared'; // Import Frame type
+ 
+ // --- Theme definition (keep as is) ---
+ const theme = createTheme({
+@@ -56,15 +59,26 @@
+ // Main App component logic - uses context
+ function AppContent() {
+   const { config, loading, error } = useShellConfig();
+-  const drawerWidth = 240; // Keep for placeholder layout width calculation
++  const [activeFrameId, setActiveFrameId] = useState<string | null>(null);
++
++  // Determine initial active frame when config loads
++  useEffect(() => {
++    if (config?.frames && config.frames.length > 0 && !activeFrameId) {
++      // Sort frames by order and set the first one as active initially
++      const sortedFrames = [...config.frames].sort((a, b) => a.order - b.order);
++      setActiveFrameId(sortedFrames[0].id);
++    }
++  }, [config, activeFrameId]); // Re-run if config changes or activeFrameId gets reset
++
++  const handleTabChange = (event: React.SyntheticEvent, newFrameId: string) => {
++    setActiveFrameId(newFrameId);
++  };
++
++  // Removed drawerWidth - no longer needed for static sidebar
+   const jobsSidebarWidth = Math.round(350 * 1.3);
+ 
+   return (
+     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+-
+-      {/* --- AppBar with Updated Title --- */}
+       <AppBar
+           position="fixed"
+           sx={{
+@@ -83,21 +97,12 @@
+               {/* TODO: Add Preferences Button (WO-9) here later */}
+           </Toolbar>
+       </AppBar>
+-      {/* --- End AppBar --- */}
+-
+-
+-      {/* Placeholder for dynamic Frame list / Sidebar (WO-6) */}
+-      <Box
+-          component="nav" // Use nav semantic element
+-          sx={{ width: drawerWidth, flexShrink: 0, borderRight: '1px solid lightgray' }}
+-          aria-label="mailbox folders" // Example aria-label
+-      >
+-           {/* Need Toolbar equivalent spacer if AppBar is fixed */}
+-           <Toolbar />
+-           <Typography variant="h6" sx={{ p: 2 }}>Frames Placeholder</Typography>
+-      </Box>
+ 
+        {/* Main content loading/error/display area */}
+       <Box
+           component="main"
+           sx={{
+               flexGrow: 1,
+-              width: `calc(100% - ${drawerWidth}px)`, // Adjust width based on sidebar
+               height: '100vh',
+               display: 'flex',
+               flexDirection: 'column', // Stack AppBar spacer and content
+@@ -107,6 +112,15 @@
+            {/* Toolbar spacer needed because AppBar is position="fixed" */}
+            <Toolbar />
+ 
++           {/* --- FIXED: Add Dynamic TabBar --- */}
++           {!loading && !error && config && config.frames && (
++               <TabBar
++                 frames={config.frames}
++                 activeFrameId={activeFrameId}
++                 onTabChange={handleTabChange}
++               />
++           )}
++
+            {/* --- Loading / Error / Content Logic --- */}
+            {loading && (
+                <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+@@ -120,7 +134,7 @@
+            )}
+            {!loading && !error && config && (
+                // Container for Middle + Right Sidebar Columns (within main area)
+-               <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'row', height: 'calc(100% - 64px)', overflow: 'hidden' }}>
++               <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'row', height: `calc(100% - 64px - ${config?.frames?.length ? '48px' : '0px'})`, overflow: 'hidden' }}> {/* Adjust height based on AppBar AND TabBar */}
+                    {/* Middle Area */}
+                    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                        <Box sx={{ flexBasis: '100%', overflowY: 'auto', p: 3 }}>
+@@ -128,7 +142,7 @@
+                               {/* TODO: Replace with dynamic app loading based on active frame (WO-7) */}
+                               <Typography>Dynamic App Area (Active Frame ID: {activeFrameId || 'None'})</Typography>
+                            </ErrorBoundary>
+-                       </Box>
++                       </Box> {/* End Single Pane */}
+                    </Box>
+ 
+                    {/* Right Jobs Sidebar Placeholder */}
+
+===CHANGE_END===

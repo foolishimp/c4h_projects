@@ -1,0 +1,77 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
+TYPE: modify
+DESCRIPTION: Implement dynamic loading of microfrontends using RemoteComponent based on active frame.
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
++++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
+@@ -1,6 +1,6 @@
+ // File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
+ 
+-import React, { useEffect, useState } from 'react';
++import React, { useEffect, useState, useMemo, Suspense } from 'react'; // Added useMemo, Suspense
+ import {
+     ThemeProvider,
+     CssBaseline,
+@@ -16,7 +16,8 @@
+ // Context and new TabBar import
+ import { useShellConfig, ShellConfigProvider } from './contexts/ShellConfigContext';
+ import TabBar from './components/layout/TabBar';
+-// Frame import is removed, it's handled in TabBar.tsx
++import { Frame, AppDefinition, AppAssignment } from 'shared'; // Keep Frame, Add AppDefinition, AppAssignment
++import { RemoteComponent } from 'shared'; // Import RemoteComponent
+ 
+ // --- Theme definition ---
+ const theme = createTheme({
+@@ -100,6 +101,28 @@
+         setActiveFrameId(newFrameId);
+     };
+ 
++    // --- Dynamic Content Logic ---
++    const renderActiveFrameContent = () => {
++        if (!config || !activeFrameId) {
++            return <Typography sx={{ p: 3 }}>No active frame selected.</Typography>;
++        }
++
++        const activeFrame = config.frames.find(f => f.id === activeFrameId);
++        if (!activeFrame || !activeFrame.assignedApps || activeFrame.assignedApps.length === 0) {
++            return <Typography sx={{ p: 3 }}>No application assigned to this frame.</Typography>;
++        }
++
++        // For WO7, assume only one app per frame
++        const assignment: AppAssignment = activeFrame.assignedApps[0];
++        const appDefinition = config.availableApps.find(app => app.id === assignment.appId);
++
++        if (!appDefinition || !appDefinition.url) { // Check for URL specifically
++             console.error(`App definition or URL missing for app ID: ${assignment.appId}`);
++             return <Typography color="error" sx={{ p: 3 }}>Error: Application definition or URL not found for '{assignment.appId}'. Check Preferences Service configuration.</Typography>;
++        }
++
++        return <RemoteComponent url={appDefinition.url} scope={appDefinition.scope} module={appDefinition.module} fallback={<CircularProgress sx={{m: 4}} />} />;
++    };
++
+     const jobsSidebarWidth = Math.round(350 * 1.3);
+ 
+     return (
+@@ -147,7 +170,7 @@
+                  )}
+                  {/* Placeholder for TabBar if loading/error */}
+                  {(loading || (error && (!config || !config.frames || config.frames.length === 0))) && (
+-                     <Box sx={{ minHeight: '48px', borderBottom: 1, borderColor: 'divider' }} />
++                     <Box sx={{ minHeight: '48px' }} /> // Simple spacer if no tabs render
+                  )}
+ 
+ 
+@@ -163,8 +186,11 @@
+                             {/* Middle Content Area */}
+                             <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                                 <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 3 }}> {/* Adjusted to take remaining space */}
++                                     {/* --- WO7 Implementation --- */}
+                                     <ErrorBoundary>
+-                                        <Typography>Dynamic App Area (Active Frame ID: {activeFrameId || 'None'})</Typography>
++                                        <Suspense fallback={<CircularProgress />}>
++                                            {renderActiveFrameContent()}
++                                        </Suspense>
+                                         {/* TODO: WO-7 Load dynamic component here based on activeFrameId */}
+                                     </ErrorBoundary>
+                                 </Box>

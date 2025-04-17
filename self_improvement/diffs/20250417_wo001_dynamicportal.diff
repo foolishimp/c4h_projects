@@ -1,0 +1,273 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/__init__.py
+TYPE: create
+DESCRIPTION: Create package initializer for the new shell_service.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/shell_service/__init__.py
+@@ -0,0 +1,2 @@
++# Initializes the shell_service package
++
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/models/__init__.py
+TYPE: create
+DESCRIPTION: Create package initializer for models.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/shell_service/models/__init__.py
+@@ -0,0 +1,2 @@
++# Initializes the models package
++
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/models/preferences.py
+TYPE: create
+DESCRIPTION: Define Pydantic models for Preferences Shell Service API data structures.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/shell_service/models/preferences.py
+@@ -0,0 +1,51 @@
++"""
++Pydantic models for the Preferences Shell Service API.
++Defines the structure for Frames, App Definitions, and overall Shell Configuration.
++"""
++
++from pydantic import BaseModel, Field
++from typing import List, Optional, Dict, Any
++import uuid
++
++# --- Models for UI Configuration ---
++
++class AppAssignment(BaseModel):
++    """How an App is assigned within a Frame."""
++    appId: str = Field(..., description="The unique ID of the assigned AppDefinition.")
++    # layoutInfo: Optional[Dict[str, Any]] = Field(None, description="Optional layout info if multiple apps per frame are supported.")
++
++class Frame(BaseModel):
++    """Represents a user-defined workspace tab (Frame) in the Shell."""
++    id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for the Frame.")
++    name: str = Field(..., description="Display name of the Frame.")
++    order: int = Field(0, description="Display order of the Frame.")
++    assignedApps: List[AppAssignment] = Field(default_factory=list, description="Apps assigned to this Frame.")
++
++# --- Models for Available Apps and Service Endpoints ---
++
++class AppDefinition(BaseModel):
++    """Defines an available microfrontend App that the Shell can load."""
++    id: str = Field(..., description="Unique identifier for the App (e.g., 'config-selector').")
++    name: str = Field(..., description="Display name of the App (e.g., 'Configuration Manager').")
++    scope: str = Field(..., description="Module Federation scope (e.g., 'configSelector').")
++    module: str = Field(..., description="Module Federation module name (e.g., './ConfigManager').")
++    url: Optional[str] = Field(None, description="URL for the remoteEntry.js if not standard.") # Potentially derived from service discovery
++
++class ServiceEndpoints(BaseModel):
++    """Defines endpoints for backend services the Shell needs to contact."""
++    jobConfigServiceUrl: Optional[str] = Field(None, description="Base URL for the Job/Config Service API.")
++    # Add other service endpoints here as needed
++
++# --- API Response/Request Models ---
++
++class ShellConfigurationResponse(BaseModel):
++    """Response model for the GET /shell/configuration endpoint."""
++    frames: List[Frame] = Field(default_factory=list)
++    availableApps: List[AppDefinition] = Field(default_factory=list)
++    serviceEndpoints: ServiceEndpoints = Field(default_factory=ServiceEndpoints)
++
++class ShellPreferencesRequest(BaseModel):
++    """Request model for the PUT /shell/preferences endpoint."""
++    frames: List[Frame] = Field(..., description="The complete, updated list of frames for the user.")
++    # Add other preference sections here if needed in the future
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/api/__init__.py
+TYPE: create
+DESCRIPTION: Create package initializer for api.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/shell_service/api/__init__.py
+@@ -0,0 +1,2 @@
++# Initializes the api package
++
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/api/routes/__init__.py
+TYPE: create
+DESCRIPTION: Create package initializer for api routes.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/shell_service/api/routes/__init__.py
+@@ -0,0 +1,2 @@
++# Initializes the routes package
++
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/api/routes/shell.py
+TYPE: create
+DESCRIPTION: Create stubbed FastAPI endpoints for the Preferences Shell Service.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/shell_service/api/routes/shell.py
+@@ -0,0 +1,52 @@
++"""
++API routes for the Preferences Shell Service.
++Provides endpoints for the frontend shell to fetch its configuration
++and save user preferences.
++"""
++
++from fastapi import APIRouter, HTTPException, Body, Depends
++from typing import List, Dict, Any
++import logging
++
++from models.preferences import ( # Assuming models are in ../models/
++    ShellConfigurationResponse,
++    ShellPreferencesRequest,
++    AppDefinition,
++    ServiceEndpoints,
++    Frame
++)
++
++# Configure logger
++logger = logging.getLogger(__name__)
++
++# Create router
++router = APIRouter(prefix="/api/v1/shell", tags=["shell_preferences"])
++
++# --- Stubbed Data (Replace with database interaction later) ---
++
++DEFAULT_AVAILABLE_APPS = [
++    AppDefinition(id='config-selector', name='Configuration Manager', scope='configSelector', module='./ConfigManager'),
++    AppDefinition(id='job-management', name='Job Manager', scope='jobManagement', module='./JobManager'),
++    AppDefinition(id='yaml-editor', name='YAML Editor', scope='yamlEditor', module='./YamlEditor'),
++]
++DEFAULT_FRAMES = [ Frame(id='default-configs', name='Configurations', order=0, assignedApps=[{'appId': 'config-selector'}]) ]
++DEFAULT_ENDPOINTS = ServiceEndpoints(jobConfigServiceUrl="http://localhost:8000") # Default Job/Config service URL
++
++# --- API Endpoints ---
++
++@router.get("/configuration", response_model=ShellConfigurationResponse)
++async def get_shell_configuration():
++    """Stub: Returns the default shell configuration."""
++    logger.info("Serving default shell configuration (stub)")
++    # In real implementation, fetch user-specific frames, available apps, and endpoints
++    return ShellConfigurationResponse(
++        frames=DEFAULT_FRAMES,
++        availableApps=DEFAULT_AVAILABLE_APPS,
++        serviceEndpoints=DEFAULT_ENDPOINTS
++    )
++
++@router.put("/preferences")
++async def save_shell_preferences(preferences: ShellPreferencesRequest = Body(...)):
++    """Stub: Accepts and logs user preferences."""
++    logger.info(f"Received preferences update (stub): {len(preferences.frames)} frames")
++    # In real implementation, validate and save preferences to database for the user
++    # For now, just log and return success
++    return {"message": "Preferences received (stub implementation)."}
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/main.py
+TYPE: create
+DESCRIPTION: Create main FastAPI application for the Preferences Shell Service.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/shell_service/main.py
+@@ -0,0 +1,38 @@
++"""
++Main FastAPI application for the Preferences Shell Service.
++"""
++
++import logging
++import sys
++from fastapi import FastAPI
++from fastapi.middleware.cors import CORSMiddleware
++
++# Assuming routes are in ./api/routes/
++from api.routes import shell as shell_router
++
++# Configure basic logging
++logging.basicConfig(stream=sys.stdout, level=logging.INFO)
++logger = logging.getLogger(__name__)
++
++
++app = FastAPI(
++    title="C4H Preferences Shell Service",
++    description="Backend-for-Frontend (BFF) serving UI configuration and preferences for the C4H Editor Shell.",
++    version="0.1.0"
++)
++
++# --- Middleware ---
++# TODO: Configure CORS properly based on deployment needs
++app.add_middleware(
++    CORSMiddleware,
++    allow_origins=["*"], # Allow all for now, restrict in production
++    allow_credentials=True,
++    allow_methods=["*"],
++    allow_headers=["*"],
++)
++
++# --- API Routers ---
++app.include_router(shell_router.router)
++
++@app.get("/health", tags=["health"])
++async def health_check():
++    return {"status": "healthy", "service": "Preferences Shell Service"}
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/database/__init__.py
+TYPE: create
+DESCRIPTION: Create package initializer for database related code.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/shell_service/database/__init__.py
+@@ -0,0 +1,2 @@
++# Initializes the database package
++
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/shell_service/database/schema.sql
+TYPE: create
+DESCRIPTION: Placeholder SQL schema definition for Preferences Shell Service data.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/shell_service/database/schema.sql
+@@ -0,0 +1,30 @@
++-- Placeholder schema for the Preferences Shell Service database
++-- Actual implementation might use PostgreSQL, MongoDB, etc. and potentially an ORM.
++
++-- Stores user-specific frame layouts
++CREATE TABLE IF NOT EXISTS user_frames (
++    user_id VARCHAR(255) NOT NULL, -- Identifier for the user
++    frame_id VARCHAR(255) PRIMARY KEY,
++    name VARCHAR(255) NOT NULL,
++    display_order INTEGER DEFAULT 0,
++    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
++    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
++    -- Add foreign key to users table if applicable
++);
++
++-- Stores the assignment of apps to frames
++CREATE TABLE IF NOT EXISTS frame_app_assignments (
++    frame_id VARCHAR(255) NOT NULL REFERENCES user_frames(frame_id) ON DELETE CASCADE,
++    app_id VARCHAR(255) NOT NULL, -- References available_apps.app_id
++    -- layout_info JSONB, -- Optional layout info if multiple apps per frame
++    PRIMARY KEY (frame_id, app_id)
++);
++
++-- Stores definitions of available microfrontend applications
++CREATE TABLE IF NOT EXISTS available_apps (
++    app_id VARCHAR(255) PRIMARY KEY, -- e.g., 'config-selector'
++    name VARCHAR(255) NOT NULL,      -- e.g., 'Configuration Manager'
++    scope VARCHAR(255) NOT NULL,     -- e.g., 'configSelector'
++    module VARCHAR(255) NOT NULL,    -- e.g., './ConfigManager'
++    url VARCHAR(1024)                -- Optional: URL if not standard
++);
+
+===CHANGE_END===

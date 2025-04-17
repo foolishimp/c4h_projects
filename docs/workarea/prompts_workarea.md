@@ -347,6 +347,36 @@ prefect_runner.py apply_diff \
     --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
     --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250412_05_fixsemantic_iterator.diff
 
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250415_00_UI_modifieddate.diff
+
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250416_00_UI_sortpiclist.diff
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/general_diff_runner.diff
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file     /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250417_wo001_dynamicportal.diff
+
+## Config Managment
+tartxt.py \
+   /Users/jim/src/apps/c4h_editor/shell_service \
+  -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**" \
+  -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_shell_service.txt
 
 workorder:
   project:
@@ -400,3 +430,31 @@ tartxt.py \
     /Users/jim/src/apps/c4h_projects/docs/design_docs/ \
  -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**" \
  -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_design_master_doc.txt
+
+
+tartxt.py \
+   /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell \
+   /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**" \
+ -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_editor_front_shell.txt
+
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250417_wo003_dynamicportal.diff
+
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250417_wo009_dynamicportal.diff
+
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/general_diff_runner.diff

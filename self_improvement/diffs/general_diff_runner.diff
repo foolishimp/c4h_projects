@@ -1,0 +1,47 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/preferences/PreferencesDialog.tsx
+TYPE: modify
+DESCRIPTION: Implement handleDeleteFrame function and connect it to the delete button.
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/preferences/PreferencesDialog.tsx
++++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/preferences/PreferencesDialog.tsx
+@@ -152,8 +152,17 @@
+       setEditingFrame(null);
+   };
+ 
+-  // TODO: Implement handleDeleteFrame
+-  // TODO: Implement handleSaveEdit (saves changes to the specific frame in local state)
++  // --- Implement Delete Handler ---
++  const handleDeleteFrame = (frameIdToDelete: string) => {
++      // Simple confirmation
++      if (window.confirm(`Are you sure you want to delete this tab (ID: ${frameIdToDelete})?`)) {
++          console.log("Deleting frame:", frameIdToDelete);
++          setEditedFrames(currentFrames =>
++              currentFrames
++                  .filter(f => f.id !== frameIdToDelete)
++                  .map((frame, idx) => ({ ...frame, order: idx })) // Recalculate order
++          );
++          setSuccessMessage(null); // Clear messages on edit
++          setSaveError(null);
++      }
++  };
++  // --- End Delete Handler ---
+ 
+   // TODO: Implement handleSaveEdit (saves changes to the specific frame in local state)
+ 
+@@ -287,8 +296,12 @@
+                                         onClick={() => !isEditMode && handleEditFrame(frame)} // Trigger edit mode
+                                         disabled={isSaving}
+                                     ><SettingsIcon fontSize="inherit" /></IconButton>
+-                                    {/* TODO: Add Delete Button */}
+-                                    <IconButton aria-label={`Delete ${frame.name}`} size="small" /* onClick={handleDeleteFrame} */ disabled={isSaving}><DeleteIcon fontSize="inherit" /></IconButton>
++                                    {/* --- Connect Delete Button --- */}
++                                    <IconButton
++                                        aria-label={`Delete ${frame.name}`}
++                                        size="small"
++                                        onClick={() => handleDeleteFrame(frame.id)} // Connect delete handler
++                                        disabled={isSaving || isEditMode}><DeleteIcon fontSize="inherit" /></IconButton>
+                                 </>
+                             }
+                             sx={{ borderBottom: 1, borderColor: 'divider', '&:last-child': { borderBottom: 0 }, opacity: isEditMode ? 0.5 : 1 }} // Dim list when editing
+===CHANGE_END===

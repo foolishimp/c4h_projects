@@ -1,0 +1,24 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/backend/api/routes/configs.py
+TYPE: modify
+DESCRIPTION: Add missing except block to the outer try statement in the list_configs endpoint to fix syntax error.
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/backend/api/routes/configs.py
++++ b/Users/jim/src/apps/c4h_editor/backend/api/routes/configs.py
+@@ -101,7 +101,12 @@
+         # Pydantic will automatically use the fields defined in ConfigListResponse
+         # including the newly added 'archived' field.
+         return configs 
+-
++    except HTTPException:
++        # Re-raise HTTPExceptions directly
++        raise
++    except Exception as e:
++        logger.error(f"Error listing configurations: {e}")
++        logger.error(traceback.format_exc())
++        raise HTTPException(status_code=500, detail=f"Failed to list configurations: {str(e)}")
+ 
+ # Get configuration endpoint
+ @router.get("/{config_type}/{config_id}", response_model=ConfigResponse)
+
+===CHANGE_END===

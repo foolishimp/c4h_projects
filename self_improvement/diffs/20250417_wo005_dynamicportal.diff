@@ -1,0 +1,561 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared/src/services/apiService.ts
+TYPE: modify
+DESCRIPTION: Modify apiService to allow dynamic configuration of the base URL after initialization.
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared/src/services/apiService.ts
++++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared/src/services/apiService.ts
+@@ -1,9 +1,13 @@
+ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
+ import { configTypes, ConfigTypeMetadata } from '../config/configTypes';
+-import { Job, JobStatus, JobListResponse, JobConfigReference } from '../types/job';
++import { Job, JobStatus, JobListResponse, JobConfigReference, JobSubmissionRequest } from '../types/job'; // Added JobSubmissionRequest
++import { Config } from '../types/config'; // Added Config base type
+ 
++// --- Base URL Handling ---
++// Initial base URL can be from env var or a default fallback
+ const API_BASE_URL = typeof process !== 'undefined' && process.env && process.env.VITE_API_BASE_URL
+-  ? process.env.VITE_API_BASE_URL 
++  ? process.env.VITE_API_BASE_URL
+   : 'http://localhost:8000'; // Default Job/Config Service URL if not configured
+ 
+ const axiosInstance = axios.create({
+@@ -14,6 +18,19 @@
+   }
+ });
+ 
++// --- Dynamic Configuration Function ---
++export const configureApiService = (baseUrl: string | undefined) => {
++  const finalBaseUrl = baseUrl || API_BASE_URL; // Use provided URL or fallback
++  if (axiosInstance.defaults.baseURL !== finalBaseUrl) {
++    console.log(`Configuring apiService baseURL to: ${finalBaseUrl}`);
++    axiosInstance.defaults.baseURL = finalBaseUrl;
++  } else {
++    console.log(`apiService baseURL already set to: ${finalBaseUrl}`);
++  }
++};
++
++// --- Interceptor ---
++
+ axiosInstance.interceptors.response.use(
+   (response) => response,
+   (error) => {
+@@ -22,8 +39,10 @@
+   }
+ );
+ 
++// --- ApiService Class ---
++
+ class ApiService {
+-  async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
++  private async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+     const response = await axiosInstance.get<T>(url, config);
+     return response.data;
+   }
+@@ -38,10 +57,12 @@
+     return response.data;
+   }
+ 
+-  async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
++  private async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+     const response = await axiosInstance.delete<T>(url, config);
+     return response.data;
+   }
+-  
++
++  // --- Public Methods ---
++
+   async getConfigs(configType: string) {
+     const endpoint = configTypes[configType]?.apiEndpoints.list;
+     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
+@@ -50,11 +71,11 @@
+     console.log(`API: Received ${response.length} configs from server`);
+     return response;
+   }
+-
+-  async getConfig(configType: string, id: string): Promise<any> {
++  // Specify Config return type
++  async getConfig(configType: string, id: string): Promise<Config> {
+     const endpoint = configTypes[configType]?.apiEndpoints.get(id);
+     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
+-    if (id === 'new') {
++    if (id === 'new' || id === '') { // Handle 'new' or empty string for creation
+       console.log(`API: Creating new empty config of type ${configType}`);
+       return this.createEmptyConfig(configType, '');
+     }
+@@ -70,7 +91,7 @@
+     }
+   }
+   
+-  private createEmptyConfig(configType: string, id: string): any {
++  private createEmptyConfig(configType: string, id: string): Config {
+     const defaultContent = configTypes[configType]?.defaultContent || {};
+     console.log(`API: Creating empty config of type ${configType} with ID ${id || 'empty'}`);
+     return {
+@@ -78,16 +99,19 @@
+       content: defaultContent,
+       metadata: {
+         description: "", // Explicitly initialize description
++        // Ensure all ConfigMetadata fields are present
+         author: "Current User",
+         created_at: new Date().toISOString(),
+         updated_at: new Date().toISOString(),
+         tags: [],
+-        version: "1.0.0"
+-      }
++        version: "1.0.0",
++        archived: false // Ensure archived exists
++      },
++      config_type: configType, // Ensure config_type is set
++      lineage: [] // Ensure lineage exists
+     };
+   }
+   
+-  async createConfig(configType: string, data: any): Promise<any> {
++  async createConfig(configType: string, data: Config): Promise<Config> {
+     const endpoint = configTypes[configType]?.apiEndpoints.create;
+     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
+     console.log(`API: Creating config of type ${configType} with ID ${data.id} at ${endpoint}`);
+@@ -97,7 +121,7 @@
+       commit_message: data.commit_message || `Create new ${configType}`, // Assuming commit_message might be temporarily added to data
+       author: data.author || data.metadata?.author || "Current User"
+     };
+-    console.log(`API: Submitting config create request:`, {
++    console.debug(`API: Submitting config create request:`, { // Use debug for potentially large objects
+       id: data.id, endpoint, description: data.metadata?.description
+     });
+     try {
+@@ -114,7 +138,7 @@
+     }
+   }
+   
+-  async updateConfig(configType: string, id: string, data: any): Promise<any> {
++  async updateConfig(configType: string, id: string, data: Config): Promise<Config> {
+     const endpoint = configTypes[configType]?.apiEndpoints.update(id);
+     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
+     console.log(`API: Updating config ${id} of type ${configType} at ${endpoint}`);
+@@ -124,7 +148,7 @@
+       commit_message: data.commit_message || `Update ${configType}`,
+       author: data.author || data.metadata?.author || "Current User"
+     };
+-    console.log(`API: Submitting config update request:`, {
++    console.debug(`API: Submitting config update request:`, { // Use debug
+       id, endpoint, description: data.metadata?.description
+     });
+     try {
+@@ -132,7 +156,7 @@
+     } catch (error: any) {
+       if (error.response?.status === 404) {
+         console.log(`Config ${id} not found, creating new`);
+-        return this.createConfig(configType, { id, ...data });
++        return this.createConfig(configType, { ...data, id }); // Ensure id is part of data for createConfig
+       }
+       throw error;
+     }
+@@ -142,7 +166,7 @@
+     const endpoint = configTypes[configType]?.apiEndpoints.delete(id);
+     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
+     console.log(`API: Deleting config ${id} of type ${configType} at ${endpoint}`);
+-    // Pass parameters as query params
++    // Pass parameters as body data for DELETE if required by backend, else use query params
+     return this.delete<{ message: string }>(endpoint, { 
+       params: { 
+         commit_message: commitMessage,
+@@ -164,7 +188,7 @@
+     return this.post<{ message: string }>(endpoint, {}, { params: { author } });
+   }
+   
+-  async cloneConfig(configType: string, id: string, newId: string) {
++  async cloneConfig(configType: string, id: string, newId: string): Promise<Config> {
+     const endpoint = configTypes[configType]?.apiEndpoints.clone(id);
+     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
+     console.log(`API: Cloning config ${id} of type ${configType} to ${newId} at ${endpoint}`);
+@@ -172,7 +196,7 @@
+     return this.post<any>(endpoint, {}, { params: { new_id: newId, author: "Current User" } });
+   }
+   
+-  async getConfigHistory(configType: string, id: string) {
++  async getConfigHistory(configType: string, id: string): Promise<{ config_id: string; config_type: string; versions: Array<{ version: string; commit_hash: string; created_at: string; author: string; message: string; }> }> {
+     const endpoint = configTypes[configType]?.apiEndpoints.history(id);
+     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
+     console.log(`API: Fetching history for config ${id} of type ${configType} at ${endpoint}`);
+@@ -189,7 +213,7 @@
+     }
+   }
+   
+-  async getJob(id: string) {
++  async getJob(id: string): Promise<Job> {
+     console.log(`API: Fetching job ${id} from /api/v1/jobs/${id}`);
+     try {
+       const response = await this.get<any>(`/api/v1/jobs/${id}`);
+@@ -200,16 +224,18 @@
+       throw error;
+     }
+   }
+-  
++
++  // This specific method might become less relevant if job submission always uses submitJobConfigs
+   async submitJob(params: {
+     workorder: string,
+     teamconfig: string,
+     runtimeconfig: string,
+     userId?: string,
+     jobConfiguration?: Record<string, any>
+-  }) {
++  }): Promise<Job> {
+     console.log('API: Submitting job with configs:', params);
+     // Format the request according to the API expectations
++    // This assumes a specific backend endpoint structure, may need adjustment
+     const requestData = {
+       workorder: { id: params.workorder, version: "latest", config_type: "workorder" },
+       team: { id: params.teamconfig, version: "latest", config_type: "teamconfig" },
+@@ -220,29 +246,15 @@
+     };
+     return this.post<any>('/api/v1/jobs', requestData);
+   }
+-  
+-  async submitJobTuple(workorderId: string, teamconfigId: string, runtimeconfigId: string, userId?: string) {
+-    // Legacy method - uses the old format
+-    console.log(`API: Submitting job tuple with workorder=${workorderId}, team=${teamconfigId}, runtime=${runtimeconfigId}`);
+-    const requestData = {
+-      configurations: {
+-        workorder: { id: workorderId, version: "latest", config_type: "workorder" },
+-        team: { id: teamconfigId, version: "latest", config_type: "teamconfig" },
+-        runtime: { id: runtimeconfigId, version: "latest", config_type: "runtimeconfig" },
+-      },
+-      user_id: userId || 'current-user',
+-      job_configuration: { max_runtime: 3600, notify_on_completion: true }
+-    };
+-    
+-    return this.post<any>('/api/v1/jobs', requestData);
+-  }
+ 
++  // Use this as the primary job submission method
+   async submitJobConfigs(
+     configs: JobConfigReference[],
+     userId?: string,
+     jobConfiguration?: Record<string, any>
+-  ) {
++  ): Promise<Job> { // Assuming the backend returns the created Job
+     console.log('API: Submitting job with configurations list:', configs);
+     if (!configs || configs.length === 0) {
+       throw new Error('At least one configuration must be provided');
+@@ -262,11 +274,11 @@
+     return this.post<any>('/api/v1/jobs/multi-config', requestData); // Use the new endpoint
+   }
+   
+-  async cancelJob(id: string) {
++  async cancelJob(id: string): Promise<Job> { // Assuming backend returns updated job
+     console.log(`API: Cancelling job ${id}`);
+     return this.post<any>(`/api/v1/jobs/${id}/cancel`, {}); 
+   }
+-  
++
+   async getJobHistory(id: string) {
+     console.log(`API: Fetching history for job ${id}`);
+     return this.get<any>(`/api/v1/jobs/${id}/history`);
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/config/defaults.ts
+TYPE: create
+DESCRIPTION: Create default configuration for shell fallback.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/config/defaults.ts
+@@ -0,0 +1,43 @@
++/**
++ * Default configuration for the Shell application.
++ * Used as a fallback if fetching configuration from the Preferences service fails.
++ */
++
++import {
++  ShellConfigurationResponse,
++  Frame,
++  AppDefinition,
++  ServiceEndpoints,
++  AppAssignment
++} from 'shared'; // Assuming types are exported from shared package
++
++const DEFAULT_JOB_CONFIG_URL = 'http://localhost:8000'; // Default backend URL
++
++// Default Available Apps (Mirrors initial stub data)
++const defaultAvailableApps: AppDefinition[] = [
++  { id: 'config-selector', name: 'Configuration Manager', scope: 'configSelector', module: './ConfigManager' },
++  { id: 'job-management', name: 'Job Manager', scope: 'jobManagement', module: './JobManager' },
++  { id: 'yaml-editor', name: 'YAML Editor', scope: 'yamlEditor', module: './YamlEditor' },
++];
++
++// Default Frames Layout
++const defaultFrames: Frame[] = [
++  {
++    id: 'frame-configs', // Give it a unique ID
++    name: 'Configurations',
++    order: 0,
++    assignedApps: [{ appId: 'config-selector' } as AppAssignment] // Cast for type safety
++  },
++  {
++    id: 'frame-jobs',
++    name: 'Jobs',
++    order: 1,
++    assignedApps: [{ appId: 'job-management' } as AppAssignment]
++  }
++];
++
++export const defaultShellConfiguration: ShellConfigurationResponse = {
++  frames: defaultFrames,
++  availableApps: defaultAvailableApps,
++  serviceEndpoints: {
++    jobConfigServiceUrl: DEFAULT_JOB_CONFIG_URL
++  }
++};
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/contexts/ShellConfigContext.tsx
+TYPE: create
+DESCRIPTION: Create React context for managing shell configuration state.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/contexts/ShellConfigContext.tsx
+@@ -0,0 +1,91 @@
++import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
++import axios from 'axios'; // Use separate axios instance for fetching config initially
++import { configureApiService } from 'shared'; // Import the configuration function
++import { ShellConfigurationResponse } from 'shared'; // Import the response type
++import { defaultShellConfiguration } from '../config/defaults'; // Import defaults
++
++interface ShellConfigContextState {
++  config: ShellConfigurationResponse | null;
++  loading: boolean;
++  error: string | null;
++  fetchConfig: () => Promise<void>; // Expose fetch function if needed
++}
++
++const ShellConfigContext = createContext<ShellConfigContextState | undefined>(undefined);
++
++interface ShellConfigProviderProps {
++  children: ReactNode;
++}
++
++// Determine the Preferences Service URL (adjust logic as needed)
++const PREFERENCES_SERVICE_URL =
++  typeof process !== 'undefined' && process.env.VITE_PREFERENCES_SERVICE_URL
++    ? process.env.VITE_PREFERENCES_SERVICE_URL
++    : 'http://localhost:8001'; // Default URL for the Preferences service itself
++
++const configFetcher = axios.create({ baseURL: PREFERENCES_SERVICE_URL });
++
++export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ children }) => {
++  const [config, setConfig] = useState<ShellConfigurationResponse | null>(null);
++  const [loading, setLoading] = useState<boolean>(true);
++  const [error, setError] = useState<string | null>(null);
++
++  const fetchConfig = async () => {
++    setLoading(true);
++    setError(null);
++    console.log(`Attempting to fetch shell configuration from ${PREFERENCES_SERVICE_URL}/api/v1/shell/configuration`);
++    try {
++      const response = await configFetcher.get<ShellConfigurationResponse>('/api/v1/shell/configuration');
++      if (response.data) {
++        console.log('Shell configuration fetched successfully:', response.data);
++        setConfig(response.data);
++        // Dynamically configure the main apiService with the fetched Job/Config service URL
++        configureApiService(response.data.serviceEndpoints?.jobConfigServiceUrl);
++      } else {
++        throw new Error('Received empty response from configuration service');
++      }
++    } catch (err: any) {
++      const errorMessage = err.response?.data?.detail || err.message || 'Failed to fetch shell configuration';
++      console.error('Error fetching shell configuration:', errorMessage, err);
++      setError(errorMessage + `. Falling back to default configuration.`);
++      // Fallback to default configuration
++      setConfig(defaultShellConfiguration);
++      // Configure apiService with default backend URL on error
++      configureApiService(defaultShellConfiguration.serviceEndpoints?.jobConfigServiceUrl);
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  useEffect(() => {
++    fetchConfig();
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, []); // Fetch only on initial mount
++
++  const contextValue: ShellConfigContextState = {
++    config,
++    loading,
++    error,
++    fetchConfig // Provide the function if manual refresh is needed
++  };
++
++  return (
++    <ShellConfigContext.Provider value={contextValue}>
++      {children}
++    </ShellConfigContext.Provider>
++  );
++};
++
++export const useShellConfig = (): ShellConfigContextState => {
++  const context = useContext(ShellConfigContext);
++  if (context === undefined) {
++    throw new Error('useShellConfig must be used within a ShellConfigProvider');
++  }
++  return context;
++};
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
+TYPE: modify
+DESCRIPTION: Refactor App.tsx to use ShellConfigContext for dynamic configuration and API setup.
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
++++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
+@@ -1,14 +1,18 @@
+-import React, { Suspense, lazy, useEffect } from 'react';
++import React, { Suspense, lazy, useEffect, useContext } from 'react';
+ import { ThemeProvider, CssBaseline, Box, CircularProgress, Typography } from '@mui/material';
+ // Ensure Grid and Typography are imported
+ import { createTheme } from '@mui/material/styles';
+ import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+ 
+-import Navigation from './components/common/Navigation';
+-import { remotes } from 'shared';
+-import ConfigTypeSelector from './components/create/ConfigTypeSelector';
++// Removed static Navigation import
++// import Navigation from './components/common/Navigation';
++import { remotes } from 'shared'; // Keep if needed for manual loading fallback? Maybe remove later.
++// Removed ConfigTypeSelector - will be loaded dynamically if assigned to a frame
++// import ConfigTypeSelector from './components/create/ConfigTypeSelector';
++
++import { ShellConfigProvider, useShellConfig } from './contexts/ShellConfigContext'; // Import context
+ 
+ // Lazy load remote components
+ const ConfigManager = lazy(() => import('configSelector/ConfigManager'));
+@@ -65,11 +69,10 @@
+   }
+ }
+ 
+-
+-// Main App component
+-function App() {
++// Main App component logic - separated to use context
++function AppContent() {
++  const { config, loading, error } = useShellConfig(); // Use context
+   const drawerWidth = 240;
+-  // Increase sidebar width by ~30% (adjust as needed)
+   const jobsSidebarWidth = Math.round(350 * 1.3);
+-  // Approx 455px
+ 
+   // Make remotes globally available for better error handling
+   useEffect(() => {
+@@ -77,13 +80,32 @@
+   }, []);
+ 
+   return (
+-    <ThemeProvider theme={theme}>
+-      <CssBaseline />
+-      <Router>
++    <Router>
++      <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
++        {/* TODO: Replace static Navigation with dynamic TabBar based on config.frames (WO-6) */}
++        {/* <Navigation drawerWidth={drawerWidth} /> */}
++        <Box sx={{ width: drawerWidth, flexShrink: 0, borderRight: '1px solid lightgray', pt: 8 }}>
++          <Typography variant="h6" sx={{ p: 2 }}>Static Sidebar Placeholder</Typography>
++          {/* Placeholder until dynamic tabs (WO-6) */}
++        </Box>
++
+         <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}> {/* Ensure outer box takes full height and hides overflow */}
+           {/* AppBar and Left Drawer */}
+-          <Navigation drawerWidth={drawerWidth} />
++          {/* <Navigation drawerWidth={drawerWidth} /> */} {/* Replaced by placeholder */}
+ 
++          {/* Loading / Error / Content */}
++          {loading && (
++             <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
++                <CircularProgress />
++             </Box>
++          )}
++          {!loading && error && (
++             <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
++                <Typography color="error">Error loading shell configuration:</Typography>
++                <Typography color="error" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>{error}</Typography>
++             </Box>
++          )}
++          {!loading && !error && config && (
+           {/* Main Content Area (to the right of Drawer) */}
+           <Box
+             component="main"
+@@ -100,7 +122,8 @@
+             <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+               {/* Middle-Top Pane */}
+               <Box sx={{ flexBasis: '50%', overflowY: 'auto', p: 3, borderBottom: '1px solid rgba(0, 0, 0, 0.12)' }}>
+-                <ErrorBoundary>
++                {/* TODO: Replace static Routes with dynamic app loading based on active frame (WO-7) */}
++                <Typography>Dynamic Content Area (Top)</Typography>
++                {/* <ErrorBoundary>
+                   <Suspense fallback={<Loading />}>
+                     {/* Routes for editors usually go in one pane */}
+                     <Routes>
+@@ -108,19 +131,19 @@
+                       <Route path="/configs/create" element={<ConfigTypeSelector />} />
+                       <Route path="/configs/:configType" element={<ConfigManagerWrapper />} />
+                       <Route path="/configs/:configType/:id" element={<ConfigManagerWrapper />} />
+-                      {/* Job detail route might 
+-need specific handling now */}
+                       <Route path="/jobs/:id" element={<JobManager />} />
+                       <Route path="*" element={<Navigate to="/" replace />} />
+                     </Routes>
+                   </Suspense>
+-                </ErrorBoundary>
++                </ErrorBoundary> */}
+               </Box>
+ 
+               {/* Middle-Bottom Pane */}
+               <Box sx={{ flexBasis: '50%', overflowY: 'auto', p: 3 }}>
++                 <Typography>Dynamic Content Area (Bottom)</Typography>
++                 {/* Placeholder for WO-7 dynamic loading */}
+                  {/*<ErrorBoundary>
+-                  <Suspense fallback={<Loading/>}>
++                  <Suspense fallback={<Loading />}>
+                       {/* Content for the second middle pane goes here */}
+                       <Typography variant="h6">Middle Pane Bottom</Typography>
+                       {/* Example: Load another app/component here */}
+@@ -144,16 +167,28 @@
+               }}
+             >
+               <ErrorBoundary>
+-                <Suspense fallback={<Loading />}>
+-                  <JobManager />
+-                </Suspense>
++                  {/* Placeholder - JobManager might be loaded dynamically via Frames/Apps later */}
++                  <Typography variant="h6" sx={{ mb: 2 }}>Jobs Placeholder</Typography>
++                  {/* <Suspense fallback={<Loading />}>
++                    <JobManager />
++                  </Suspense> */}
+               </ErrorBoundary>
+             </Box>
+           </Box>
++          )} {/* End conditional rendering for loaded config */}
+         </Box>
+       </Router>
++  );
++}
++
++// Wrap AppContent with Providers in the main export
++function App() {
++  return (
++    <ThemeProvider theme={theme}>
++      <CssBaseline />
++      <ShellConfigProvider> {/* Provide context */}
++        <AppContent /> {/* Render main content */}
++      </ShellConfigProvider>
+     </ThemeProvider>
+   );
+ }
+-
+ export default App;
+
+===CHANGE_END===
