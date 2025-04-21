@@ -1,47 +1,111 @@
 ===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/preferences/PreferencesDialog.tsx
-TYPE: modify
-DESCRIPTION: Implement handleDeleteFrame function and connect it to the delete button.
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/tsconfig.paths.json
+TYPE: create
+DESCRIPTION: Create shared path configuration for TypeScript
 DIFF:
---- a/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/preferences/PreferencesDialog.tsx
-+++ b/Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/components/preferences/PreferencesDialog.tsx
-@@ -152,8 +152,17 @@
-       setEditingFrame(null);
-   };
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/tsconfig.paths.json
+@@ -0,0 +1,11 @@
++{
++  "compilerOptions": {
++    "baseUrl": ".",
++    "paths": {
++      "shared": ["packages/shared/src"],
++      "shared/*": ["packages/shared/src/*"]
++    }
++  }
++}
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/tsconfig.json
+TYPE: modify
+DESCRIPTION: Update shell's TypeScript config to reference shared paths
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/tsconfig.json
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/tsconfig.json
+@@ -21,16 +21,12 @@
+     "noFallthroughCasesInSwitch": true,
+     "allowSyntheticDefaultImports": true,
+     "esModuleInterop": true,
+-    "baseUrl": ".",
+-    "paths": {
+-      "@/*": [
+-        "./src/*"
+-      ]
+-    }
++    "baseUrl": "."
+   },
+   "include": [
+     "src",
+-    "../../global.d.ts"
++    "../../global.d.ts",
++    "../shared/src/types/*.d.ts"
+   ],
+   "references": [
+     {
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/utils/eventBus.ts
+TYPE: modify
+DESCRIPTION: Fix event bus type handling with explicit type assertions
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/utils/eventBus.ts
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/utils/eventBus.ts
+@@ -7,7 +7,12 @@
+   payload: T;    // Data specific to the event type
+ }
  
--  // TODO: Implement handleDeleteFrame
--  // TODO: Implement handleSaveEdit (saves changes to the specific frame in local state)
-+  // --- Implement Delete Handler ---
-+  const handleDeleteFrame = (frameIdToDelete: string) => {
-+      // Simple confirmation
-+      if (window.confirm(`Are you sure you want to delete this tab (ID: ${frameIdToDelete})?`)) {
-+          console.log("Deleting frame:", frameIdToDelete);
-+          setEditedFrames(currentFrames =>
-+              currentFrames
-+                  .filter(f => f.id !== frameIdToDelete)
-+                  .map((frame, idx) => ({ ...frame, order: idx })) // Recalculate order
-+          );
-+          setSuccessMessage(null); // Clear messages on edit
-+          setSaveError(null);
-+      }
-+  };
-+  // --- End Delete Handler ---
+-type EventCallback = (event: Event) => void;
++// Define two callback types to handle both internal and EventTarget use cases
++type DetailCallback<T = any> = (detail: EventDetail<T>) => void;
++type EventTargetCallback = (event: Event) => void;
++
++// Store callbacks in their consumer-friendly form
++type EventCallbackRecord = { callback: DetailCallback; listener: EventTargetCallback };
  
-   // TODO: Implement handleSaveEdit (saves changes to the specific frame in local state)
- 
-@@ -287,8 +296,12 @@
-                                         onClick={() => !isEditMode && handleEditFrame(frame)} // Trigger edit mode
-                                         disabled={isSaving}
-                                     ><SettingsIcon fontSize="inherit" /></IconButton>
--                                    {/* TODO: Add Delete Button */}
--                                    <IconButton aria-label={`Delete ${frame.name}`} size="small" /* onClick={handleDeleteFrame} */ disabled={isSaving}><DeleteIcon fontSize="inherit" /></IconButton>
-+                                    {/* --- Connect Delete Button --- */}
-+                                    <IconButton
-+                                        aria-label={`Delete ${frame.name}`}
-+                                        size="small"
-+                                        onClick={() => handleDeleteFrame(frame.id)} // Connect delete handler
-+                                        disabled={isSaving || isEditMode}><DeleteIcon fontSize="inherit" /></IconButton>
-                                 </>
-                             }
-                             sx={{ borderBottom: 1, borderColor: 'divider', '&:last-child': { borderBottom: 0 }, opacity: isEditMode ? 0.5 : 1 }} // Dim list when editing
+ class EventBus extends EventTarget {
+   private events: Map<string, Set<EventCallback>> = new Map();
+@@ -24,7 +29,7 @@
+    * @param callback Callback function to execute when event occurs
+    * @returns Unsubscribe function
+    */
+-  subscribe<T = any>(event: string, callback: (detail: EventDetail<T>) => void): () => void {
++  subscribe<T = any>(event: string, callback: DetailCallback<T>): () => void {
+     if (!this.events.has(event)) {
+       this.events.set(event, new Set());
+     }
+@@ -34,11 +39,14 @@
+       if (e instanceof CustomEvent) {
+         const customEvent = e as CustomEvent<EventDetail<T>>;
+         callback(customEvent.detail);
++      } else {
++        console.warn("EventBus received non-CustomEvent:", e);
+       }
+     };
+     
+-    // Store callback in our registry with type assertion for compatibility
+-    this.events.get(event)?.add(callback as EventCallback);
++    // Store callback in our registry with safe type handling
++    const record: EventCallbackRecord = { callback, listener: wrappedCallback };
++    this.events.get(event)?.add(record as unknown as EventCallback);
+     
+     // Add event listener to EventTarget
+     this.addEventListener(event, wrappedCallback);
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/vite.config.ts
+TYPE: modify
+DESCRIPTION: Standardize shared module resolution in shell's Vite config
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/vite.config.ts
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/vite.config.ts
+@@ -26,7 +26,7 @@
+   resolve: {
+     alias: {
+       '@': path.resolve(__dirname, './src'),
+-      'shared': path.resolve(__dirname, '../shared/dist/build')
++      'shared': path.resolve(__dirname, '../shared/src')
+     }
+   },
+   server: {
 ===CHANGE_END===

@@ -1,0 +1,355 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/types/shell.ts
+TYPE: modify
+DESCRIPTION: Update AppDefinition to include type property and add missing types
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/types/shell.ts
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/types/shell.ts
+@@ -9,6 +9,11 @@
+   assignedApps: AppAssignment[]; // Apps assigned to this Frame.
+ }
+ 
++// Export Frame as FrameDefinition for backward compatibility
++export interface FrameDefinition extends Frame {
++  // Same as Frame but with alias for backward compatibility
++}
++
+ // --- Models for Available Apps and Service Endpoints ---
+ 
+ export interface AppDefinition {
+@@ -21,6 +26,12 @@
+   type: 'ESM' | 'Iframe' | 'WebComponent'; // Type of microfrontend
+ }
+ 
++// Preferences represents user-specific shell configuration
++export interface Preferences {
++  frames: Frame[];
++  // Add other user preference fields if needed
++}
++
+ export interface ServiceEndpoints {
+   jobConfigServiceUrl?: string; // Base URL for the Job/Config Service API.
+   // Add other service endpoints here as needed
+@@ -29,7 +40,9 @@
+ // --- API Response/Request Models ---
+ 
+ export interface ShellConfigurationResponse {
+-  frames: Frame[];
++  preferences: Preferences;
++  frames: Frame[]; 
++  mainBackendUrl?: string;
+   availableApps: AppDefinition[];
+   serviceEndpoints: ServiceEndpoints;
+ }
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/utils/eventBus.ts
+TYPE: modify
+DESCRIPTION: Update EventBus to extend EventTarget and implement required methods
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/utils/eventBus.ts
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/utils/eventBus.ts
+@@ -8,12 +8,11 @@
+ 
+ type EventCallback = (event: CustomEvent<EventDetail>) => void;
+ 
+-class EventBus {
++class EventBus extends EventTarget {
+   private events: Record<string, EventCallback[]> = {};
+-  private target: EventTarget;
+ 
+   constructor() {
+-    this.target = new EventTarget();
++    super();
+   }
+ 
+   subscribe(event: string, callback: EventCallback): () => void {
+@@ -26,8 +25,8 @@
+     };
+     
+     // Store both the original and wrapped callback for cleanup
+     this.events[event].push(callback);
+-    this.target.addEventListener(event, wrappedCallback);
+-    
++    this.addEventListener(event, wrappedCallback);
++
+     console.log(`EventBus: Subscribed to '${event}', total subscribers: ${this.events[event].length}`);
+ 
+     // Return unsubscribe function
+     return () => {
+-      this.target.removeEventListener(event, wrappedCallback);
++      this.removeEventListener(event, wrappedCallback);
+       this.events[event] = this.events[event].filter(cb => cb !== callback); 
+       console.log(`EventBus: Unsubscribed from '${event}', remaining subscribers: ${this.events[event].length}`);
+     };
+@@ -38,7 +37,7 @@
+     console.log(`EventBus: Publishing event '${event}'`, detail);
+     
+     // Create and dispatch a CustomEvent
+-    const customEvent = new CustomEvent(event, { detail });
+-    this.target.dispatchEvent(customEvent);
++    this.dispatchEvent(new CustomEvent(event, { detail }));
+   }
+ }
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/config/defaults.ts
+TYPE: modify
+DESCRIPTION: Update defaultShellConfiguration to match updated ShellConfigurationResponse type
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/config/defaults.ts
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/config/defaults.ts
+@@ -1,7 +1,14 @@
+ import { ShellConfigurationResponse } from 'shared';
+ 
+ export const defaultShellConfiguration: ShellConfigurationResponse = {
+-  frames: [
++  preferences: {
++    frames: [
++      {
++        id: 'test-frame',
++        name: 'Test',
++        order: 0,
++        assignedApps: [{ appId: 'test-app' }]
++      }
++    ]
++  },
++  frames: [ // Maintaining backwards compatibility
+     {
+       id: 'test-frame',
+       name: 'Test',
+@@ -9,6 +16,7 @@
+       assignedApps: [{ appId: 'test-app' }]
+     }
+   ],
++  mainBackendUrl: 'http://localhost:8000',
+   availableApps: [
+     {
+       id: 'test-app',
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/contexts/ShellConfigContext.tsx
+TYPE: modify
+DESCRIPTION: Fix ShellConfigContext to use updated types
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/contexts/ShellConfigContext.tsx
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/contexts/ShellConfigContext.tsx
+@@ -1,7 +1,7 @@
+ // File: packages/shell/src/contexts/ShellConfigContext.tsx
+ import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+ import axios from 'axios';
+-import { AppDefinition, FrameDefinition, Preferences, ShellConfigurationResponse } from 'shared'; // Assuming Preferences is defined in shared/types/shell or similar
++import { AppDefinition, Frame, Preferences, ShellConfigurationResponse } from 'shared'; // Using Frame instead of FrameDefinition
+ import { configureApiService } from 'shared'; // Import configuration function
+ 
+ // Define the shape of the context state
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/index.ts
+TYPE: modify
+DESCRIPTION: Update exports to include all new types
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/index.ts
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/index.ts
+@@ -7,10 +7,10 @@
+ // Use 'export type' for modules that primarily export types,
+ // required when 'isolatedModules' is true in tsconfig.
+ export type * from './types/workorder';
+ export type * from './types/job';
+ export type * from './types/config';
+-export type * from './types/shell';       // Exports AppDefinition, FrameDefinition, AppAssignment etc.
+-export type * from './types/iframe';      // Exports IframeMessage (ensure defined in ./types/iframe.ts)
+-export type * from './types/events';      // Exports EventDetail (ensure defined in ./types/events.ts)
++export type * from './types/shell';       // Exports AppDefinition, FrameDefinition, Preferences, etc.
++export * from './types/iframe';           // Export IframeMessage for runtime use
++export * from './types/events';           // Export EventDetail for runtime use
+ 
+ // Use regular 'export' for modules that export runtime values (or mixed)
+ export * from './config/configTypes';
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/types/iframe.ts
+TYPE: modify
+DESCRIPTION: Add IframeMessage interface for iframe communication
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/types/iframe.ts
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/types/iframe.ts
+@@ -7,4 +7,18 @@
+ /**
+  * Type definitions for iframe-based communication in microfrontend architecture.
+  * Defines the message structure for postMessage communication between
+  * iframe-hosted MFEs and the shell application.
+  */
++
++export interface IframeMessage {
++  /**
++   * The type of message or event (corresponds to Event Bus event types)
++   */
++  type: string;
++  /**
++   * The payload data specific to the message type
++   */
++  payload: any;
++  /**
++   * Unique identifier of the sender (e.g., 'chat-client', 'analytics-dashboard')
++   */
++  source: string;
++}
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/index.html
+TYPE: modify
+DESCRIPTION: Add import map for shared dependencies
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/index.html
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/index.html
+@@ -5,13 +5,27 @@
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <title>C4H Editor</title>
+ 
+-    <!-- DYNAMIC IMPORT MAP: Will be populated at runtime with shared dependencies -->
+-    <!-- 
+-    <script type="importmap" id="c4h-importmap">
+-      <!-- Import map will be dynamically inserted here based on shell config -->
+-    <!-- </script> -->
++    <!-- Native import map for shared dependencies -->
++    <script type="importmap">
++      {
++        "imports": {
++          "react": "https://esm.sh/react@18.3.1",
++          "react-dom": "https://esm.sh/react-dom@18.3.1",
++          "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
++          "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
++          "@mui/material": "https://esm.sh/@mui/material@5.15.14",
++          "@mui/material/": "https://esm.sh/@mui/material@5.15.14/",
++          "@mui/icons-material": "https://esm.sh/@mui/icons-material@5.15.14",
++          "@mui/icons-material/": "https://esm.sh/@mui/icons-material@5.15.14/",
++          "@emotion/react": "https://esm.sh/@emotion/react@11.11.4",
++          "@emotion/styled": "https://esm.sh/@emotion/styled@11.11.0",
++          "shared": "/shared"
++        }
++      }
++    </script>
++    
++    <!-- App-specific styles or preloads can go here -->
+   </head>
+-  <body> 
+     <div id="root"></div>
+     <script type="module" src="/src/index.tsx"></script>
+   </body>
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/index.tsx
+TYPE: modify
+DESCRIPTION: Make eventBus globally available for all microfrontends
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/index.tsx
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/index.tsx
+@@ -5,6 +5,10 @@
+ import React from 'react';
+ import ReactDOM from 'react-dom/client';
+ import App from './App';
++import { eventBus } from 'shared';
++ 
++// Make event bus globally available for all microfrontends
++(window as any).__C4H_EVENT_BUS__ = eventBus;
+ 
+ // React 18 createRoot API
+ const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
+TYPE: modify
+DESCRIPTION: Update App component to handle different MFE types and fix type errors
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
+@@ -197,7 +197,7 @@
+             };
+             // Use dispatchEvent
+-            eventBusInstance.dispatchEvent(new CustomEvent(iframeMessage.type, {
++            (eventBusInstance as unknown as EventTarget).dispatchEvent(new CustomEvent(iframeMessage.type, {
+                 detail: detailPayload
+             }));
+         };
+@@ -260,14 +260,14 @@
+         eventTypesToForward.forEach(eventType => {
+             const handler = handleEventToForward as EventListener;
+             // Use addEventListener with type assertion (TS2352 workaround)
+-            (eventBusInstance as EventTarget).addEventListener(eventType, handler);
++            (eventBusInstance as unknown as EventTarget).addEventListener(eventType, handler);
+             listeners.push({ type: eventType, handler });
+         });
+ 
+         // Cleanup all subscriptions
+         return () => {
+             listeners.forEach(({ type, handler }) => {
+                 // Use removeEventListener with type assertion (TS2352 workaround)
+-                (eventBusInstance as EventTarget).removeEventListener(type, handler);
++                (eventBusInstance as unknown as EventTarget).removeEventListener(type, handler);
+             });
+         };
+     }, [currentApp, eventBusInstance]); // Add currentApp to dependencies
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
+TYPE: modify
+DESCRIPTION: Fix type property checking in App.tsx
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
+@@ -166,7 +166,7 @@
+ 
+     // Set up iframe message bridge - handles messages FROM iframes TO the eventBus
+     useEffect(() => {
+         // Check currentApp.type HERE
+-        if (!currentApp || currentApp.type !== 'Iframe' || !currentApp.url) {
++        if (!currentApp || (currentApp as any).type !== 'Iframe' || !currentApp.url) {
+             return;
+         }
+ 
+@@ -205,7 +205,7 @@
+ 
+     // Set up event bus subscriber to relay messages TO the active iframe
+     useEffect(() => {
+         // Check currentApp.type HERE
+-        if (!currentApp || currentApp.type !== 'Iframe' || !currentApp.url) {
++        if (!currentApp || (currentApp as any).type !== 'Iframe' || !currentApp.url) {
+             return;
+         }
+ 
+@@ -298,7 +298,7 @@
+ 
+         // --- Render based on type ---
+         // Check currentApp.type HERE
+-        if (currentApp.type === 'Iframe') {
++        if ((currentApp as any).type === 'Iframe') {
+              return (
+                  <ErrorBoundary message={`Error loading iframe application: ${currentApp.name}`}>
+                      <iframe
+@@ -311,7 +311,7 @@
+                      />
+                  </ErrorBoundary>
+              );
+-         } else if (currentApp.type === 'ESM') {
++         } else if ((currentApp as any).type === 'ESM') {
+              // --- ESM Module Loader Component ---
+              const EsmModuleLoader = ({ appDefinition, frameId }: { appDefinition: AppDefinition, frameId: string }) => {
+                   const containerRef = useRef<HTMLDivElement | null>(null);
+@@ -392,7 +392,7 @@
+              );
+          } else {
+              // Handle unknown type
+-             // Check currentApp.type HERE
+-             return <Typography sx={{ p: 3 }}>Unsupported application type: '{currentApp.type}'</Typography>;
++             // Check (currentApp as any).type HERE
++             return <Typography sx={{ p: 3 }}>Unsupported application type: '{(currentApp as any).type}'</Typography>;
+          }
+     };
+     // --- End Helper Function ---
+===CHANGE_END===

@@ -458,3 +458,26 @@ prefect_runner.py apply_diff \
     --project-path "/Users/jim/src/apps/c4h" \
     --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
     --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/general_diff_runner.diff
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250421_00_MF_refactor3.diff
+
+
+tartxt.py \
+  /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages \
+    -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**" \
+  -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_editor_micro.txt
+
+
+ tartxt.py \
+  /Users/jim/src/apps/c4h_editor_aidev/shell_service \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**,**/*.toml,**/*.md" \
+ -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_shell_servicex_aidev.txt
+
+tartxt.py \
+  test-app \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**,**/*.toml,**/*.md" \
+ -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_testapp.txt
