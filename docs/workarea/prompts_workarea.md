@@ -465,6 +465,12 @@ prefect_runner.py apply_diff \
     --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
     --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250421_00_MF_refactor3.diff
 
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250421_00_removetechdebt.diff
+
 
 tartxt.py \
   /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages \

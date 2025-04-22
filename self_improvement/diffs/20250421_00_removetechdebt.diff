@@ -1,0 +1,128 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/test-app/package.json
+TYPE: modify
+DESCRIPTION: Remove unused single-spa dependencies from test-app
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/test-app/package.json
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/test-app/package.json
+@@ -11,8 +11,6 @@
+     "react": "^18.3.1",
+     "react-dom": "^18.3.1",
+     "shared": "workspace:*",
+-    "single-spa": "^6.0.3",
+-    "single-spa-react": "^6.0.2"
+   },
+   "devDependencies": {
+     "@vitejs/plugin-react": "^4.3.4",
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/package.json
+TYPE: modify
+DESCRIPTION: Remove unused federation plugin and systemjs dependencies from shell
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/package.json
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/package.json
+@@ -13,13 +13,11 @@
+     "@emotion/styled": "^11.11.0",
+     "@mui/icons-material": "^5.15.14",
+     "@mui/material": "^5.15.14",
+-    
+     "axios": "^1.6.7",
+-    "@originjs/vite-plugin-federation": "^1.3.5",
+     "date-fns": "^3.6.0",
+     "diff": "^5.2.0",
+     "js-yaml": "^4.1.0",
+-    "react": "^18.3.1",
++    "react": "^18.3.1",
+     "react-dom": "^18.3.1",
+     "react-router-dom": "^6.22.3",
+     "systemjs": "^6.14.3",
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/yaml-editor/package.json
+TYPE: modify
+DESCRIPTION: Remove unused federation plugin dependency from yaml-editor
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/yaml-editor/package.json
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/yaml-editor/package.json
+@@ -25,7 +25,6 @@
+     "shared": "workspace:*"
+   },
+   "devDependencies": {
+-    "@originjs/vite-plugin-federation": "^1.3.5",
+     "@types/js-yaml": "^4.0.9",
+     "@types/react": "^18.2.61",
+     "@types/react-dom": "^18.2.19",
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/job-management/package.json
+TYPE: modify
+DESCRIPTION: Remove unused single-spa dependency from job-management
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/job-management/package.json
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/job-management/package.json
+@@ -17,8 +17,7 @@
+     "react": "^18.3.1",
+     "react-dom": "^18.3.1",
+     "react-router-dom": "^6.22.3",
+-    "shared": "workspace:*",
+-    "single-spa-react": "^6.0.2"
++    "shared": "workspace:*"
+   },
+   "devDependencies": {
+     "@types/react": "^18.2.61",
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/package.json
+TYPE: modify
+DESCRIPTION: Remove unused federation plugin dependency from config-selector
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/package.json
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/package.json
+@@ -15,7 +15,6 @@
+     "yaml-editor": "file:../yaml-editor"
+   },
+   "devDependencies": {
+-    "@originjs/vite-plugin-federation": "^1.3.5",
+     "@types/js-yaml": "^4.0.9",
+     "@types/react": "^18.2.61",
+     "@types/react-dom": "^18.2.19",
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/index.ts
+TYPE: modify
+DESCRIPTION: Remove export of deleted RemoteComponent
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/index.ts
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/index.ts
+@@ -18,7 +18,6 @@
+ // Export shared components (runtime values)
+ export { default as TimeAgo } from './components/TimeAgo';
+ export { default as DiffViewer } from './components/DiffViewer';
+-export { default as RemoteComponent } from './components/RemoteComponent';
+ 
+ // Export API service (runtime values) AND configuration function
+ export { apiService, api, configureApiService } from './services/apiService';
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/test-app/index.html
+TYPE: modify
+DESCRIPTION: Update test-app HTML to use main.tsx entry point
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/test-app/index.html
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/test-app/index.html
+@@ -12,6 +12,6 @@
+   <body>
+     <div id="root"></div>
+     -    <script type="module" src="/src/index.tsx"></script>
++    <script type="module" src="/src/main.tsx"></script>
+   </body>
+ </html>
+
+===CHANGE_END===
