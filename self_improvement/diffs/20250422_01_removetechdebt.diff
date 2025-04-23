@@ -1,0 +1,552 @@
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/utils/mountHelper.ts
+TYPE: create
+DESCRIPTION: Create standardized mount helper for microfrontends
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/utils/mountHelper.ts
+@@ -0,0 +1,94 @@
++/**
++ * /packages/shared/src/utils/mountHelper.ts
++ * Standardized mount helper for microfrontends
++ * Ensures proper context providers and event bus integration
++ */
++import React from 'react';
++import { createRoot } from 'react-dom/client';
++import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
++import CssBaseline from '@mui/material/CssBaseline';
++import { eventBus } from './eventBus';
++import { EventTypes } from '../types/events';
++
++export interface MountOptions<P = any> {
++  domElement: HTMLElement;
++  Component: React.ComponentType<P>;
++  props?: P & Record<string, any>;
++  appId?: string;
++  onUnmount?: () => void;
++}
++
++/**
++ * Creates a standardized mounter function for MFEs
++ * Ensures consistent provider wrapping and event handling
++ */
++export function createMounter<P = any>(options: MountOptions<P>) {
++  const { domElement, Component, props = {} as P, appId = '', onUnmount } = options;
++  
++  // Normalize config type from appId if needed
++  const configType = normalizeConfigType(props.configType || appId);
++  
++  // Add navigation handlers with fallbacks
++  const enhancedProps = {
++    ...props,
++    configType,
++    onNavigateTo: props.onNavigateTo || ((id: string) => {
++      console.log(`[MountHelper] Using fallback navigation for navigateTo:`, id);
++      eventBus.publish(EventTypes.NAVIGATION_REQUEST, {
++        source: appId,
++        payload: { action: 'navigateTo', target: id, from: appId }
++      });
++    }),
++    onNavigateBack: props.onNavigateBack || (() => {
++      console.log(`[MountHelper] Using fallback navigation for back`);
++      eventBus.publish(EventTypes.NAVIGATION_REQUEST, {
++        source: appId,
++        payload: { action: 'back', from: appId }
++      });
++    })
++  };
++  
++  // Create root and render with all required providers
++  const root = createRoot(domElement);
++  root.render(
++    <React.StrictMode>
++      <StyledEngineProvider injectFirst>
++        <ThemeProvider theme={createTheme()}>
++          <CssBaseline />
++          <Component {...enhancedProps} />
++        </ThemeProvider>
++      </StyledEngineProvider>
++    </React.StrictMode>
++  );
++  
++  // Return unmount function
++  return {
++    unmount: () => {
++      console.log(`[MountHelper] Unmounting component with appId:`, appId);
++      root.unmount();
++      if (onUnmount) onUnmount();
++    }
++  };
++}
++
++/**
++ * Helper to normalize config types between plural and singular forms
++ */
++function normalizeConfigType(configType: string): string {
++  if (!configType) return '';
++  
++  // Remove 'config-selector-' prefix if present
++  const withoutPrefix = configType.replace(/^config-selector-/, '');
++  
++  // Convert plural to singular if needed
++  if (withoutPrefix.endsWith('s')) {
++    return withoutPrefix.slice(0, -1);
++  }
++  
++  return withoutPrefix;
++}
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/utils/eventBusBridge.ts
+TYPE: create
+DESCRIPTION: Create event bus bridge for iframe communication
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/utils/eventBusBridge.ts
+@@ -0,0 +1,74 @@
++/**
++ * /packages/shell/src/utils/eventBusBridge.ts
++ * Event Bus Bridge for iframe communication
++ * Allows MFEs in iframes to communicate with the main event bus
++ */
++
++/**
++ * Sets up bidirectional communication between the global event bus
++ * and iframe-hosted MFEs through postMessage.
++ */
++export function setupEventBusBridge(window: Window) {
++  const eventBus = (window as any).__C4H_EVENT_BUS__;
++  if (!eventBus) {
++    console.error('EventBusBridge: Cannot find global event bus');
++    return { tearDown: () => {} };
++  }
++  
++  console.log('EventBusBridge: Setting up iframe communication bridge');
++  
++  // Function to get all iframe windows
++  const getAllIframeWindows = () => {
++    return Array.from(document.querySelectorAll('iframe'))
++      .map(iframe => ({
++        window: iframe.contentWindow,
++        id: iframe.getAttribute('data-mfe-id') || 'unknown'
++      }))
++      .filter(item => item.window != null);
++  };
++  
++  // Listen for messages from iframes
++  const handleIframeMessage = (event: MessageEvent) => {
++    // Skip messages without proper format
++    if (!event.data || event.data.type !== 'c4h:event') {
++      return;
++    }
++    
++    // Extract event data
++    const { eventType, detail, source } = event.data;
++    
++    console.log(`EventBusBridge: Received ${eventType} from iframe ${source}`);
++    
++    // Forward to global event bus
++    eventBus.publish(eventType, {
++      source: `iframe:${source || 'unknown'}`,
++      payload: detail?.payload || detail
++    });
++  };
++  
++  // Handle events on the global bus to forward to iframes
++  const handleBusEvent = (eventType: string, detail: any) => {
++    // Don't forward events that originated from iframes back to them
++    if (detail?.source?.startsWith('iframe:')) {
++      return;
++    }
++    
++    // Broadcast to all iframes
++    getAllIframeWindows().forEach(({ window: frame, id }) => {
++      if (frame) {
++        frame.postMessage({
++          type: 'c4h:event',
++          eventType,
++          detail,
++          source: 'shell'
++        }, '*'); // In production, specify target origin for security
++      }
++    });
++  };
++  
++  // Set up event listeners
++  window.addEventListener('message', handleIframeMessage);
++  eventBus._addEventListener = eventBus.addEventListener; // Store original method
++  eventBus.addEventListener = (type: string, listener: EventListener) => {
++    eventBus._addEventListener(type, listener);
++    handleBusEvent(type, {}); // Initial notification
++  };
++  
++  // Return teardown function
++  return {
++    tearDown: () => {
++      window.removeEventListener('message', handleIframeMessage);
++      if (eventBus._addEventListener) {
++        eventBus.addEventListener = eventBus._addEventListener;
++        delete eventBus._addEventListener;
++      }
++      console.log('EventBusBridge: Bridge torn down');
++    }
++  };
++}
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
+TYPE: modify
+DESCRIPTION: Add support for iframe and web component MFEs in shell App.tsx
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
+@@ -24,6 +24,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
+ import { useShellConfig, ShellConfigProvider } from './contexts/ShellConfigContext';
+ import TabBar from './components/layout/TabBar';
+ import { AppAssignment, eventBus } from 'shared';
++import { setupEventBusBridge } from './utils/eventBusBridge';
+ import PreferencesDialog from './components/preferences/PreferencesDialog';
+ 
+ // Theme definition
+@@ -83,6 +84,11 @@ function AppContent() {
+     const [previousActiveFrameIdRef, useRef<string | null>(null);
+ 
+     // Effect to handle component unmount cleanup
++    // Set up event bus bridge for iframe communication
++    useEffect(() => {
++        const bridge = setupEventBusBridge(window);
++        return () => bridge.tearDown();
++    }, []);
+     useEffect(() => {
+         isMountedRef.current = true;
+         return () => {
+@@ -371,6 +377,58 @@ function AppContent() {
+                 }
++
++                // Handle iframe MFEs
++                if (appDef.type === 'iframe') {
++                    console.log(`App.tsx: Mount Effect - Creating iframe for app ${appDef.id} from ${appDef.url}`);
++                    containerElement.innerHTML = '';
++                    const iframe = document.createElement('iframe');
++                    iframe.src = appDef.url;
++                    iframe.style.width = '100%';
++                    iframe.style.height = '100%';
++                    iframe.style.border = 'none';
++                    iframe.setAttribute('title', appDef.name || appDef.id);
++                    iframe.setAttribute('data-mfe-id', appDef.id);
++                    containerElement.appendChild(iframe);
++                    
++                    // Store unmount function
++                    mountedModulesRef.current[currentFrameIdForMount] = {
++                        unmount: () => {
++                            if (containerElement.contains(iframe)) {
++                                containerElement.removeChild(iframe);
++                            }
++                        }
++                    };
++                    return;
++                }
++
++                // Handle web component MFEs
++                if (appDef.type === 'wc') {
++                    console.log(`App.tsx: Mount Effect - Creating web component for app ${appDef.id}`);
++                    containerElement.innerHTML = '';
++                    // Implementation for Web Component type MFEs
++                    const elementName = appDef.id.includes('-') ? appDef.id : `c4h-${appDef.id}`;
++                    const wcElement = document.createElement(elementName);
++                    
++                    // Apply props as attributes
++                    Object.entries(baseProps).forEach(([key, value]) => {
++                        if (typeof value === 'string') {
++                            wcElement.setAttribute(key, value);
++                        } else {
++                            (wcElement as any)[key] = value;
++                        }
++                    });
++                    
++                    // Apply custom props
++                    Object.entries(customProps).forEach(([key, value]) => {
++                        (wcElement as any)[key] = value;
++                    });
++                    
++                    containerElement.appendChild(wcElement);
++                    
++                    // Store unmount function
++                    mountedModulesRef.current[currentFrameIdForMount] = {
++                        unmount: () => {
++                            if (containerElement.contains(wcElement)) {
++                                containerElement.removeChild(wcElement);
++                            }
++                        }
++                    };
++                    return;
++                }
++
+                 console.log(`App.tsx: Mount Effect - Preparing to load & mount module for frame ${activeFrameId}, app ${appDef.id} from ${appDef.url}`);
+                 containerElement.innerHTML = '';
+                 const loadingIndicator = document.createElement('div');
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/test-app/src/TestApp.tsx
+TYPE: modify
+DESCRIPTION: Fix TestApp event handling issues and improve logging
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/test-app/src/TestApp.tsx
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/test-app/src/TestApp.tsx
+@@ -12,15 +12,9 @@ interface TestAppProps {
+ }
+ 
+ // Extend Window interface if necessary, or use type assertion carefully
+-declare global {
+-    interface Window {
+-        __C4H_EVENT_BUS__?: typeof localEventBus;
+-    }
+-}
+ 
+ const TestApp: React.FC<TestAppProps> = (props) => {
+     const [messageCount, setMessageCount] = useState(0);
+-    const [lastMessage, setLastMessage] = useState<any>(null);
+ 
+     // --- Determine which bus instance to use ---
+     // Prioritize window global, fall back to local import
+@@ -29,35 +23,55 @@ const TestApp: React.FC<TestAppProps> = (props) => {
+     console.log(`[TestApp] Initializing. Using event bus instance from: ${busSource}`);
+     // --- End Bus Instance Determination ---
+ 
++    // Keep stable reference to lastMessage using ref instead of state
++    // This prevents setState issues during strict mode double-render
++    const lastMessageRef = React.useRef<any>(null);
++    const [lastMessage, setLastMessage] = useState<any>(null);
+ 
+-    // Callback to handle received messages
++    // Stable callback to handle received messages
+     const handleTestMessage = useCallback((detail: any) => {
+-         // --- ADDED LOG: Confirm handler execution ---
+-         console.log('[TestApp] handleTestMessage received:', detail);
+-         console.log('[TestApp] Current messageCount state BEFORE update:', messageCount);
+-        setLastMessage(detail);
+-        setMessageCount((prevCount) => {
+-             const newCount = prevCount + 1;
+-             // --- ADDED LOG: Confirm state update logic ---
+-             console.log(`[TestApp] Updating messageCount from ${prevCount} to ${newCount}`);
+-             return newCount;
+-         });
+-    }, [messageCount]); // Include messageCount dependency if likely not needed here
++        // --- ADDED LOG: Confirm handler execution ---
++        console.log('[TestApp] handleTestMessage received:', detail);
++        
++        // Update ref immediately
++        lastMessageRef.current = detail;
++        
++        // Update state safely with functional update
++        setLastMessage(detail);
++        setMessageCount(prev => {
++            const newCount = prev + 1;
++            console.log(`[TestApp] Updating messageCount from ${prev} to ${newCount}`);
++            return newCount;
++        });
++    }, []); // No dependencies needed with functional updates
+ 
+     // Effect for subscribing and unsubscribing
+     useEffect(() => {
+-        // --- ADDED LOG: Log which bus instance useEffect is using ---
++        // Log which bus instance this effect is using
+         console.log(`[TestApp] useEffect running. Subscribing using bus from: ${busSource}`);
+ 
++        // Send initial message to announce mount
++        bus.publish('test:mounted', { 
++            source: 'test-app',
++            payload: { timestamp: Date.now(), message: 'TestApp mounted' } 
++        });
++
+         // Subscribe using the selected bus instance
+         const unsubscribe = bus.subscribe('test:ping', handleTestMessage);
++        
++        // Test self-ping
++        setTimeout(() => {
++            console.log('[TestApp] Sending initial self-ping test message');
++            bus.publish('test:ping', { 
++                source: 'test-app', 
++                payload: { timestamp: Date.now(), text: 'Self-ping on mount' } 
++            });
++        }, 500);
+ 
+         // Return cleanup function
+         return () => {
+             console.log(`[TestApp] useEffect cleanup. Unsubscribing using bus from: ${busSource}`);
+             unsubscribe();
++            bus.publish('test:unmounted', { source: 'test-app', payload: { timestamp: Date.now() } });
+         };
+-    // Dependency array includes 'bus' to re-subscribe if the instance changes (unlikely now)
+-    // and handleTestMessage to ensure the latest callback is used.
+     }, [bus, handleTestMessage, busSource]); // Added busSource for logging clarity
+ 
+ 
+@@ -76,7 +90,10 @@ const TestApp: React.FC<TestAppProps> = (props) => {
+             <Typography variant="h6">Test App</Typography>
+             <Typography>Loaded successfully!</Typography>
+             <Typography>Messages Received: {messageCount}</Typography>
+-            <Typography>Last Message:</Typography>
++            <Typography>
++                Last Message: 
++                {lastMessage ? '' : ' (None yet - try clicking the button below)'}
++            </Typography>
+             <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f0f0f0', padding: '5px' }}>
+                 {JSON.stringify(lastMessage, null, 2)}
+             </pre>
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/main.tsx
+TYPE: modify
+DESCRIPTION: Fix ConfigSelector main.tsx to properly handle config types and shell readiness
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/main.tsx
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/main.tsx
+@@ -4,56 +4,61 @@
+ import React from 'react';
+ import { createRoot } from 'react-dom/client';
+ import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
+-import CssBaseline from '@mui/material/CssBaseline';
++import CssBaseline from '@mui/material/CssBaseline'; 
+ import ConfigManager from './ConfigManager';
+ import { ConfigProvider } from './contexts/ConfigContext';
+-import { configTypes } from 'shared';
++import { configTypes, eventBus, EventTypes } from 'shared';
+ 
+-// Define mapping between app IDs and config types
++/**
++ * Map between shell app IDs and normalized config types
++ */
+ const appIdToConfigType: Record<string, string> = {
+   'config-selector-workorders': 'workorder',
+-  'config-selector-teams': 'teamconfig',
++  'config-selector-teams': 'teamconfig', 
++  'config-selector-teamconfigs': 'teamconfig',
+   'config-selector-runtime': 'runtimeconfig'
+ };
+ 
+-// Create mount function with configType detection
++/**
++ * Mount function for ConfigSelector with proper config type detection
++ * and shell readiness check
++ */
+ export function mount(props: any) {
+   const { domElement, appId = '', customProps = {} } = props; // Use appId from props
+-// Determine config type from app ID
+-  let configType = 'workorder';
+-// Default
++ 
++  // Determine config type from app ID or props
++  let configType = customProps.configType || 'workorder'; // Default
+   
+-  if (appId && appIdToConfigType[appId]) { // Check map using appId
+-    configType = appIdToConfigType[appId];
+-  } else {
+-    // Try extracting from pattern
+-    const matches = appId.match(/config-selector-(\w+)/i); // Match against appId
+-    if (matches && matches[1]) {
+-      const extracted = matches[1].toLowerCase();
+-      
+-      // Check if this is a plural that we need to make singular
+-      if (extracted.endsWith('s') && configTypes[extracted.slice(0, -1)]) {
+-        configType = extracted.slice(0, -1);
+-      } else if (configTypes[extracted]) {
+-        configType = extracted;
++  if (appId) {
++    if (appIdToConfigType[appId]) {
++      // Direct mapping exists
++      configType = appIdToConfigType[appId];
++    } else {
++      // Try pattern matching
++      const matches = appId.match(/config-selector-(\w+)/i);
++      if (matches && matches[1]) {
++        const extracted = matches[1].toLowerCase();
++        
++        // Handle plural forms
++        if (extracted.endsWith('s') && configTypes[extracted.slice(0, -1)]) {
++          configType = extracted.slice(0, -1);
++        } else if (configTypes[extracted]) {
++          configType = extracted;
++        }
+       }
+     }
+   }
+   
+-  console.log(`Mounting ConfigManager with configType: ${configType} (from app ID: ${appId})`);
+-// Create root and render
+-  const root = createRoot(domElement);
+-  root.render(
+-    <StyledEngineProvider injectFirst>
+-      <ThemeProvider theme={createTheme()}>
+-        <CssBaseline />
+-        <ConfigProvider configType={configType} initialConfigId={customProps.configId}> {/* Pass initialConfigId if provided */}
+-          <ConfigManager configType={configType} {...props.customProps} />
+-        </ConfigProvider>
+-      </ThemeProvider>
+-    </StyledEngineProvider>
+-  );
++  console.log(`ConfigSelector: Mount called with configType: ${configType} from appId: ${appId}`);
+   
+-  return { unmount: () => root.unmount() };
++  // Create shell-aware mount function
++  const root = createRoot(domElement);
++  const render = () => {
++    root.render(
++      <StyledEngineProvider injectFirst>
++        <ThemeProvider theme={createTheme()}>
++          <CssBaseline />
++          <ConfigProvider configType={configType} initialConfigId={customProps.configId}>
++            <ConfigManager 
++              configType={configType} 
++              {...customProps} 
++              onNavigateTo={customProps.onNavigateTo}
++              onNavigateBack={customProps.onNavigateBack}
++            />
++          </ConfigProvider>
++        </ThemeProvider>
++      </StyledEngineProvider>
++    );
++  };
++  
++  // Initial render
++  render();
++  
++  // Listen for shell config ready event
++  const unsubscribe = eventBus.subscribe(EventTypes.SHELL_CONFIG_READY, () => {
++    console.log('ConfigSelector: Received shell:config:ready event, re-rendering');
++    render();
++  });
++  
++  return { 
++    unmount: () => {
++      unsubscribe();
++      root.unmount();
++    }
++  };
+ }
+ 
+ export default ConfigManager;
+===CHANGE_END===
+
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/index.ts
+TYPE: modify
+DESCRIPTION: Update shared index.ts to export mountHelper
+DIFF:
+--- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/index.ts
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/index.ts
+@@ -23,6 +23,9 @@ export * from './types/events';
+ // Use regular 'export' for modules that export runtime values (or mixed)
+ export * from './config/configTypes';
+ 
++// Export mount helper utility
++export * from './utils/mountHelper';
++
+ // Export runtime utilities/values
+ export { eventBus } from './utils/eventBus';
+ 
+===CHANGE_END===

@@ -12,6 +12,8 @@ CRITICAL OUTPUT REQUIREMENTS:
 
 Format: You MUST return ONLY the changes in the following exact plain text format. Repeat the entire ===CHANGE_BEGIN===...===CHANGE_END=== block for each file modification.
 
+IMPORTANT - consider your output, if you do not return the result in a "Plaintext block", then it can't be copied and used.
+
 Plaintext
 
 ===CHANGE_BEGIN===

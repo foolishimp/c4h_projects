@@ -487,3 +487,35 @@ tartxt.py \
   test-app \
  -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**,**/*.toml,**/*.md" \
  -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_testapp.txt
+
+  tartxt.py \         
+  /Users/jim/src/apps/c4h_editor_aidev/c4h-micro \
+  /Users/jim/src/apps/c4h_editor_aidev/backend \
+  /Users/jim/src/apps/c4h_editor_aidev/shell_service \  
+    -x "**.bak,**.md,**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/backup**,**/workspaces/**" \
+--history 2 --verbose  -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_full_service.txt
+
+#### AI Dev changes
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h_editor_aidev" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/general_diff_runner.diff
+
+export PYTHONPATH="/Users/jim/src/apps/c4h" && \
+prefect_runner.py apply_diff \
+    --project-path "/Users/jim/src/apps/c4h_editor_aidev" \
+    --config /Users/jim/src/apps/c4h_projects/self_improvement/apply_config.yml \
+    --diff-file /Users/jim/src/apps/c4h_projects/self_improvement/diffs/20250422_01_removetechdebt.diff
+
+### shell + config editor
+tartxt.py \
+   /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell \
+   /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared \
+   /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared \   
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**" \
+ -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_editor_front_shell.txt
+
+
+
