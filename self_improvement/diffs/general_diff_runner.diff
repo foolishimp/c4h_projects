@@ -1,465 +1,809 @@
 ===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/index.tsx
-TYPE: modify
-DESCRIPTION: Add shell service URL global variable for MFE bootstrapping
-DIFF:
---- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/index.tsx
-+++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/index.tsx
-@@ -9,7 +9,10 @@
- import App from './App';
- import { eventBus } from 'shared';
-  
--// Make event bus globally available for all microfrontends
-+// Make critical services globally available for all microfrontends
-+// Set shell service URL global for MFE bootstrap process
-+(window as any).__C4H_SHELL_SERVICE_URL__ = import.meta.env.VITE_PREFS_SERVICE_URL || 'http://localhost:8011';
-+
- // This allows iframe MFEs or others to access it via window
- (window as any).__C4H_EVENT_BUS__ = eventBus;
-  
-===CHANGE_END===
-
-===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/utils/bootstrapHelper.ts
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/hooks/useShellEvents.ts
 TYPE: create
-DESCRIPTION: Create bootstrap helper utility (without isBootstrapped check)
+DESCRIPTION: Create custom hook for managing shell event bus listeners.
 DIFF:
 --- /dev/null
-+++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/utils/bootstrapHelper.ts
-@@ -0,0 +1,51 @@
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/hooks/useShellEvents.ts
+@@ -0,0 +1,57 @@
 +/**
-+ * /packages/shared/src/utils/bootstrapHelper.ts
-+ * Utility for MFE self-initialization and configuration
++ * /packages/shell/src/hooks/useShellEvents.ts
++ * Custom hook to encapsulate shell event bus subscriptions and bridge setup.
 + */
-+import axios from 'axios';
-+import { configureApiService, checkApiServiceReady } from '../services/apiService';
-+// Note: EventBus and EventTypes are not strictly needed here anymore unless
-+// the bootstrap itself needs to publish events. Removed for simplicity.
-+// import { eventBus, EventTypes } from './eventBus';
++import { useEffect } from 'react';
++import { eventBus, EventTypes, EventDetail, NavigationRequestPayload } from 'shared';
++import { setupEventBusBridge } from '../utils/eventBusBridge';
 +
-+/**
-+ * MFE bootstrap status
-+ */
-+export interface BootstrapResult {
-+  success: boolean;
-+  config?: any; // Consider using a more specific ShellConfigurationResponse type if needed later
-+  error?: any;
++interface UseShellEventsProps {
++    onNavigationRequest: (payload: NavigationRequestPayload) => void;
++    onYamlEditRequest: (detail: EventDetail) => void;
 +}
 +
++export function useShellEvents({ onNavigationRequest, onYamlEditRequest }: UseShellEventsProps) {
++
++    // Effect for setting up the iframe event bus bridge
++    useEffect(() => {
++        console.log("useShellEvents: Setting up event bus bridge.");
++        const bridge = setupEventBusBridge(window);
++        // Cleanup function for the bridge
++        return () => {
++            console.log("useShellEvents: Tearing down event bus bridge.");
++            bridge.tearDown();
++        };
++    }, []); // Run only once on mount
++
++    // Effect for handling navigation requests from MFEs
++    useEffect(() => {
++        const handleNavigation = (detail: EventDetail<NavigationRequestPayload>) => {
++            if (detail?.payload) {
++                 console.log(`useShellEvents: Received navigation request:`, detail.payload);
++                 onNavigationRequest(detail.payload);
++            } else {
++                 console.warn("useShellEvents: Received navigation request with invalid payload:", detail);
++            }
++        };
++        console.log("useShellEvents: Subscribing to navigation:request event.");
++        const unsubscribe = eventBus.subscribe(EventTypes.NAVIGATION_REQUEST, handleNavigation);
++        // Cleanup function
++        return () => {
++            console.log("useShellEvents: Unsubscribing from navigation:request event.");
++            unsubscribe();
++        };
++    }, [onNavigationRequest]); // Rerun if the callback changes
++
++    // Effect for handling in-place YAML editor requests
++    useEffect(() => {
++        console.log("useShellEvents: Subscribing to config:edit:yaml event.");
++        const unsubscribe = eventBus.subscribe('config:edit:yaml', onYamlEditRequest);
++        // Cleanup function
++        return () => {
++            console.log("useShellEvents: Unsubscribing from config:edit:yaml event.");
++            unsubscribe();
++        };
++    }, [onYamlEditRequest]); // Rerun if the callback changes
++
++}
+
+===CHANGE_END===
+===CHANGE_BEGIN===
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/hooks/useMfeOrchestrator.tsx
+TYPE: create
+DESCRIPTION: Create custom hook to manage MFE mounting, unmounting, and state.
+DIFF:
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/hooks/useMfeOrchestrator.tsx
+@@ -0,0 +1,201 @@
 +/**
-+ * Get shell service URL from globals
++ * /packages/shell/src/hooks/useMfeOrchestrator.tsx
++ * Custom hook to handle the lifecycle (mounting, unmounting) of Microfrontends (MFEs).
 + */
-+export function getShellServiceUrl(): string | undefined {
-+  // Type assertion for window global property
-+  return (window as any).__C4H_SHELL_SERVICE_URL__;
++import React, { useEffect, useRef, useState, useCallback } from 'react';
++import * as ReactDOM from 'react-dom/client';
++import { Box, Typography, CircularProgress } from '@mui/material';
++import { AppDefinition, Frame, MFEType, Preferences, configTypes } from 'shared';
++
++interface MfeOrchestratorProps {
++    activeFrameId: string | null;
++    config: Preferences | null;
++    availableApps: AppDefinition[] | null;
++    onConfigNavigate: (action: 'navigateTo' | 'back', target?: string) => void; // Callback for config navigation
 +}
 +
-+/**
-+ * Bootstrap MFE by loading configuration from the shell service
-+ * and configuring required services. This should be called by each MFE on mount.
-+ *
-+ * @param mfeId Identifier for the MFE (for logging)
-+ * @returns Promise with bootstrap result
-+ */
-+export async function bootstrapConfig(mfeId: string): Promise<BootstrapResult> {
-+  console.log(`[${mfeId}] Attempting bootstrap...`);
-+
-+  const shellServiceUrl = getShellServiceUrl();
-+  if (!shellServiceUrl) {
-+    console.error(`[${mfeId}] Bootstrap failed: Shell service URL not found on window!`);
-+    return { success: false, error: "Shell service URL not found" };
-+  }
-+
-+  try {
-+    console.log(`[${mfeId}] Bootstrapping: Fetching config from ${shellServiceUrl}...`);
-+    // Use axios directly as apiService might not be configured yet for this MFE instance
-+    const response = await axios.get(`${shellServiceUrl}/api/v1/shell/configuration`);
-+    const config = response.data;
-+
-+    if (config?.serviceEndpoints?.jobConfigServiceUrl) {
-+      // This configures the apiService instance specific to the calling MFE's context/bundle
-+      configureApiService(config.serviceEndpoints.jobConfigServiceUrl);
-+      console.log(`[${mfeId}] Bootstrap successful: apiService configured with endpoint: ${config.serviceEndpoints.jobConfigServiceUrl}`);
-+      return { success: true, config };
-+    } else {
-+      console.error(`[${mfeId}] Bootstrap failed: Config response missing required serviceEndpoints.jobConfigServiceUrl`);
-+      throw new Error("Configuration response missing required service endpoint URL");
++// Define a simple Error Boundary specific to MFE loading
++class MfeErrorBoundary extends React.Component<{ children: React.ReactNode, frameId: string | null }, { hasError: boolean, error: any }> {
++    constructor(props: { children: React.ReactNode, frameId: string | null }) {
++        super(props);
++        this.state = { hasError: false, error: null };
 +    }
-+  } catch (error: any) {
-+    console.error(`[${mfeId}] Bootstrap failed:`, error.response?.data || error.message || error);
-+    return { success: false, error: error.response?.data || error.message || error };
-+  }
-+}
-
-===CHANGE_END===
-
-===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/index.ts
-TYPE: modify
-DESCRIPTION: Export bootstrap helper from shared package
-DIFF:
---- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/index.ts
-+++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/index.ts
-@@ -12,6 +12,7 @@
- export * from './types/iframe';        
- export * from './types/events';        
- 
-+export * from './utils/bootstrapHelper';
- // Use regular 'export' for modules that export runtime values (or mixed)
- export * from './config/configTypes';
- 
-===CHANGE_END===
-
-===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/services/apiService.ts
-TYPE: modify
-DESCRIPTION: Enhance apiService with better configuration tracking and error handling
-DIFF:
---- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/services/apiService.ts
-+++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/services/apiService.ts
-@@ -30,15 +30,10 @@
-   const finalBaseUrl = baseUrl || API_BASE_URL;
-   console.log(`apiService: configureApiService CALLED with: ${baseUrl}. Setting base URL to: ${finalBaseUrl}`);
- 
--  if (axiosInstance.defaults.baseURL !== finalBaseUrl) {
--    console.log(`apiService: Configuring baseURL to: ${finalBaseUrl}`);
--    axiosInstance.defaults.baseURL = finalBaseUrl;
--    isApiConfigured = true; // Mark as configured
--  } else {
--    console.log(`apiService: baseURL already set to: ${finalBaseUrl}`);
--    // If it's already set to the final URL (even if it's the default), consider it configured.
--    isApiConfigured = true;
--  }
-+  // Always set regardless of previous value to ensure consistency across MFEs
-+  axiosInstance.defaults.baseURL = finalBaseUrl;
-+  isApiConfigured = true; // Mark as configured
-+  console.log(`apiService: Successfully configured with baseURL: ${finalBaseUrl}`);
- };
- 
- // --- NEW: Function to check readiness ---
-===CHANGE_END===
-
-===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/main.tsx
-TYPE: modify
-DESCRIPTION: Add bootstrap implementation to config-selector MFE
-DIFF:
---- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/main.tsx
-+++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/main.tsx
-@@ -4,7 +4,7 @@
- import React from 'react';
- import { createRoot } from 'react-dom/client';
- import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
--import CssBaseline from '@mui/material/CssBaseline'; 
-+import CssBaseline from '@mui/material/CssBaseline';
- import ConfigManager from './ConfigManager';
- import { ConfigProvider } from './contexts/ConfigContext';
--import { configTypes, eventBus, EventTypes } from 'shared';
-+import { configTypes, eventBus, EventTypes, bootstrapConfig } from 'shared';
- 
- /**
-  * Map between shell app IDs and normalized config types
-@@ -16,6 +16,25 @@
-   'config-selector-runtime': 'runtimeconfig'
- };
- 
-+/**
-+ * Bootstrap function for config-selector MFE
-+ * Called by shell when mounting to ensure proper configuration
-+ */
-+export async function bootstrapMfe(mfeId: string) {
-+  console.log(`ConfigSelector: Bootstrap called for ${mfeId}`);
-+  
-+  try {
-+    const result = await bootstrapConfig(mfeId);
-+    if (!result.success) {
-+      console.error(`ConfigSelector: Bootstrap failed: ${result.error}`);
-+      return { success: false, error: result.error };
++    static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
++    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) { console.error(`MfeErrorBoundary (Frame ${this.props.frameId}):`, error, errorInfo); }
++    render() {
++        if (this.state.hasError) {
++            return (
++                <Box sx={{ p: 2, color: 'error.main', border: '1px dashed red' }}>
++                    <Typography variant="h6">Error Loading Application</Typography>
++                    <Typography variant="body2">Failed to load or render the application for frame {this.props.frameId || 'unknown'}.</Typography>
++                    <details style={{ whiteSpace: 'pre-wrap', marginTop: '0.5em', fontSize: '0.8em' }}>
++                        <summary>Details</summary>
++                        {this.state.error?.toString()}
++                    </details>
++                </Box>
++            );
++        }
++        return this.props.children;
 +    }
-+    return { success: true, config: result.config };
-+  } catch (error) {
-+    console.error(`ConfigSelector: Bootstrap error:`, error);
-+    return { success: false, error };
-+  }
 +}
 +
- /**
-  * Mount function for ConfigSelector with proper config type detection
-  * and shell readiness check
-@@ -23,6 +42,10 @@
- export function mount(props: any) {
-   const { domElement, appId = '', customProps = {} } = props; // Use appId from props
-  
-+  // Call bootstrap when mounted
-+  bootstrapMfe(appId)
-+    .catch(err => console.error(`ConfigSelector: Bootstrap error during mount:`, err));
-+  
-   // Determine config type from app ID or props
-   let configType = customProps.configType || 'workorder'; // Default
-   
-===CHANGE_END===
++export function useMfeOrchestrator({ activeFrameId, config, availableApps, onConfigNavigate }: MfeOrchestratorProps) {
++    // Ref to store unmount functions for currently mounted MFEs
++    // Keyed by frameId to handle cleanup correctly
++    const mountedModulesRef = useRef<Record<string, { unmount: () => void }>>({});
++    // Ref to track the container element for the active MFE
++    const mfeContainerRef = useRef<HTMLDivElement | null>(null);
++    // State to hold the content to be rendered in the main area
++    const [mfeContentKey, setMfeContentKey] = useState<string | null>(null);
++
++    // Effect for mounting/unmounting MFEs when activeFrameId or config changes
++    useEffect(() => {
++        let isEffectActive = true;
++        const containerElement = mfeContainerRef.current; // Capture ref for this effect instance
++        const currentFrameIdForMount = activeFrameId; // Capture frame ID for this effect instance
++
++        // --- Cleanup Function ---
++        // This cleanup runs BEFORE the next effect execution or on component unmount.
++        // It should clean up the MFE related to the *previous* activeFrameId.
++        const cleanupPreviousMfe = () => {
++            // Find the module associated with the frameId this effect instance was for
++            const moduleToUnmount = mountedModulesRef.current[currentFrameIdForMount!]; // Use non-null assertion after check
++            if (currentFrameIdForMount && moduleToUnmount?.unmount) {
++                console.log(`useMfeOrchestrator: Cleanup - Unmounting MFE for frame ${currentFrameIdForMount}`);
++                try {
++                    moduleToUnmount.unmount();
++                } catch (err) {
++                    console.error(`useMfeOrchestrator: Cleanup - Error during unmount for frame ${currentFrameIdForMount}:`, err);
++                }
++                // Remove the reference *after* attempting unmount
++                delete mountedModulesRef.current[currentFrameIdForMount];
++            }
++            // Clear the container content associated with the previous frame
++            if (containerElement) {
++                 containerElement.innerHTML = '';
++            }
++        };
++
++        // --- Mounting Logic ---
++        console.log(`useMfeOrchestrator: Mount Effect triggered. Frame ID: ${currentFrameIdForMount}`);
++        setMfeContentKey(currentFrameIdForMount); // Update key to force re-render of container
++
++        // Prerequisite checks (container, config, apps)
++        if (!containerElement || !currentFrameIdForMount || !config || !availableApps) {
++            console.log("useMfeOrchestrator: Skipping mount (Prerequisites not met).");
++            cleanupPreviousMfe(); // Clean up if prerequisites fail after initial mount
++            return cleanupPreviousMfe; // Return cleanup for this effect instance
++        }
++
++        // Find Frame and App Definition (using only the FIRST assigned app for now)
++        const activeFrame = config.frames?.find(f => f.id === currentFrameIdForMount);
++        if (!activeFrame || !activeFrame.assignedApps || activeFrame.assignedApps.length === 0) {
++            console.log(`useMfeOrchestrator: Skipping mount (Frame ${currentFrameIdForMount} invalid or no apps assigned).`);
++            containerElement.innerHTML = '<div style="padding: 1em; font-style: italic;">Frame has no application assigned.</div>';
++            cleanupPreviousMfe();
++            return cleanupPreviousMfe;
++        }
++
++        // --- TODO: Future enhancement for WO-LAYOUT-008 ---
++        // This section needs to be updated to handle multiple apps based on layout
++        // For now, it only mounts the first app.
++        const assignment = activeFrame.assignedApps[0];
++        const appDef = availableApps.find(app => app.id === assignment.appId);
++
++        if (!appDef || !appDef.url) {
++             console.error(`useMfeOrchestrator: Skipping mount (App definition or URL missing for ${assignment.appId}).`);
++             containerElement.innerHTML = `<div style="color: red; padding: 1em;">Error: Cannot load app ${assignment.appId}. Definition or URL missing.</div>`;
++             cleanupPreviousMfe();
++             return cleanupPreviousMfe;
++        }
++        // --- End Single App Logic ---
++
++        // Clear container *before* new mount attempt
++        containerElement.innerHTML = '';
++
++        // --- Mount Based on MFE Type (Simplified Example) ---
++        const baseProps = { domElement: containerElement, appId: appDef.id };
++        const customProps: Record<string, any> = {};
++        if (configTypes && configTypes.hasOwnProperty(appDef.id)) {
++            Object.assign(customProps, {
++                configType: appDef.id,
++                // Use passed-in callback for navigation
++                onNavigateTo: (id: string) => onConfigNavigate('navigateTo', id),
++                onNavigateBack: () => onConfigNavigate('back')
++            });
++        }
++
++        // Only handle ESM for this example refactor
++        console.log(`useMfeOrchestrator: Preparing to dynamically import ESM module for frame ${currentFrameIdForMount}, app ${appDef.id} from ${appDef.url}`);
++        const loadingIndicator = document.createElement('div');
++        loadingIndicator.style.padding = '1em';
++        loadingIndicator.innerText = `Loading ${appDef.name}...`;
++        containerElement.appendChild(loadingIndicator);
++
++        import(/* @vite-ignore */ appDef.url).then(async module => {
++            if (!isEffectActive || activeFrameId !== currentFrameIdForMount || !containerElement.isConnected) {
++                 console.log(`useMfeOrchestrator: Aborting ESM mount for ${appDef.id}. Effect inactive, frame changed, or container disconnected.`);
++                 if (containerElement.contains(loadingIndicator)) try { containerElement.removeChild(loadingIndicator); } catch (e) { }
++                 return;
++            }
++            if (containerElement.contains(loadingIndicator)) try { containerElement.removeChild(loadingIndicator); } catch (e) { }
++
++            console.log(`useMfeOrchestrator: ESM Module loaded for ${appDef.id}`, module);
++
++            try {
++                if (module.bootstrapMfe) await module.bootstrapMfe(appDef.id);
++
++                let unmountFn: (() => void) | undefined = undefined;
++                if (module.mount) {
++                    const mountResult = module.mount({ ...baseProps, customProps });
++                    unmountFn = mountResult?.unmount || module.unmount;
++                } else if (module.default) { // Assume React Component
++                    const ReactComponent = module.default;
++                    const root = ReactDOM.createRoot(containerElement);
++                    // Wrap in error boundary for this specific MFE
++                    root.render(
++                        <React.StrictMode>
++                            <MfeErrorBoundary frameId={currentFrameIdForMount}>
++                                <ReactComponent {...baseProps} {...customProps} />
++                            </MfeErrorBoundary>
++                        </React.StrictMode>
++                    );
++                    unmountFn = () => {
++                         console.log(`useMfeOrchestrator: Unmount - Unmounting React component ${appDef.id} in frame ${currentFrameIdForMount}`);
++                         try { root.unmount(); } catch (e) { console.error("Error during reactRoot.unmount:", e); }
++                    };
++                } else {
++                     throw new Error("Module is not a valid ESM MFE.");
++                }
++
++                if (unmountFn) {
++                    mountedModulesRef.current[currentFrameIdForMount] = { unmount: unmountFn };
++                    console.log(`useMfeOrchestrator: Stored unmount function for ${currentFrameIdForMount}`);
++                } else {
++                     mountedModulesRef.current[currentFrameIdForMount] = { unmount: () => console.warn(`No-op unmount for ${currentFrameIdForMount}`) };
++                     console.warn(`useMfeOrchestrator: No valid unmount function found/stored for ${currentFrameIdForMount}`);
++                }
++            } catch (mountErr) {
++                 console.error(`useMfeOrchestrator: Error mounting/rendering ESM module ${appDef.id}:`, mountErr);
++                 containerElement.innerHTML = `<div style="color: red; padding: 1em;">Failed to mount/render application. Check console.</div>`;
++                 delete mountedModulesRef.current[currentFrameIdForMount];
++            }
++
++        }).catch(importErr => {
++             if (!isEffectActive || activeFrameId !== currentFrameIdForMount) return;
++             console.error(`useMfeOrchestrator: Error dynamically importing module ${appDef.id} from ${appDef.url}:`, importErr);
++             if (containerElement.contains(loadingIndicator)) try { containerElement.removeChild(loadingIndicator); } catch(e) {}
++             containerElement.innerHTML = `<div style="color: red; padding: 1em;">Failed to load application module. Check console & network tab.</div>`;
++             delete mountedModulesRef.current[currentFrameIdForMount];
++        });
++
++        // Return the cleanup function for *this specific effect execution*
++        return cleanupPreviousMfe;
++
++    }, [activeFrameId, config, availableApps, onConfigNavigate]); // Dependencies
++
++    // --- Component to Render ---
++    // This component's sole purpose is to provide the div container with the ref
++    // The key forces remount when activeFrameId changes, helping cleanup.
++    const MfeContainer = useCallback(() => (
++        <div
++            ref={mfeContainerRef}
++            key={mfeContentKey} // Use state key linked to activeFrameId
++            id={`mfe-container-wrapper-${mfeContentKey || 'empty'}`} // Dynamic ID for debugging
++            style={{ height: '100%', width: '100%', overflow: 'auto' }}
++        >
++            {/* Content is mounted dynamically by the useEffect */}
++            {!mfeContentKey && <Typography sx={{ p: 3, fontStyle: 'italic' }}>Select a tab.</Typography>}
++        </div>
++    ), [mfeContentKey]); // Recreate when key changes
++
++    return { MfeContainer }; // Return the component to render
++}
++
 
+===CHANGE_END===
 ===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/job-management/src/main.tsx
-TYPE: modify
-DESCRIPTION: Add bootstrap implementation to job-management MFE
+FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/components/layout/MainLayout.tsx
+TYPE: create
+DESCRIPTION: Create MainLayout component to handle overall page structure.
 DIFF:
---- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/job-management/src/main.tsx
-+++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/job-management/src/main.tsx
-@@ -7,6 +7,7 @@
- import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
- import CssBaseline from '@mui/material/CssBaseline';
- import JobManager from './JobManager';
-+import { bootstrapConfig } from 'shared';
- import { JobProvider } from './contexts/JobContext';
- 
- // Define props interface for mount function
-@@ -27,6 +28,25 @@
-   },
- });
- 
+--- /dev/null
++++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/components/layout/MainLayout.tsx
+@@ -0,0 +1,55 @@
 +/**
-+ * Bootstrap function for job-management MFE
-+ * Called by shell when mounting to ensure proper configuration
++ * /packages/shell/src/components/layout/MainLayout.tsx
++ * Component responsible for the main application layout structure (AppBar, Sidebar, Content).
 + */
-+export async function bootstrapMfe(mfeId: string) {
-+  console.log(`JobManagement: Bootstrap called for ${mfeId}`);
-+  
-+  try {
-+    const result = await bootstrapConfig(mfeId);
-+    if (!result.success) {
-+      console.error(`JobManagement: Bootstrap failed: ${result.error}`);
-+      return { success: false, error: result.error };
-+    }
-+    return { success: true, config: result.config };
-+  } catch (error) {
-+    console.error(`JobManagement: Bootstrap error:`, error);
-+    return { success: false, error };
-+  }
++import React from 'react';
++import {
++    Box,
++    AppBar,
++    Toolbar,
++    Typography,
++    IconButton,
++} from '@mui/material';
++import SettingsIcon from '@mui/icons-material/Settings';
++
++interface MainLayoutProps {
++    sidebarContent: React.ReactNode; // Content for the sidebar (e.g., TabBar)
++    mainContent: React.ReactNode; // Content for the main area (e.g., MFE container)
++    preferencesDialog: React.ReactNode; // The preferences dialog component
++    onOpenPreferences: () => void; // Callback to open preferences
++    sidebarWidth: number; // Width of the sidebar
 +}
 +
- // Export the component directly
- export default JobManager;
- 
-@@ -35,6 +55,10 @@
-  */
- export function mount(props: MountProps) {
-   const { domElement, customProps = {} } = props;
++const MainLayout: React.FC<MainLayoutProps> = ({
++    sidebarContent,
++    mainContent,
++    preferencesDialog,
++    onOpenPreferences,
++    sidebarWidth,
++}) => {
++    return (
++        <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
++            {/* Top AppBar */}
++            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
++                <Toolbar>
++                    <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'baseline' }}>
++                        <Typography variant="h5" noWrap component="div" sx={{ mr: 2 }}>Visual Prompt Studio</Typography>
++                        <Typography variant="subtitle1" noWrap component="div" sx={{ opacity: 0.8 }}>C4H Editor</Typography>
++                    </Box>
++                    <IconButton color="inherit" aria-label="open preferences" onClick={onOpenPreferences} edge="end">
++                        <SettingsIcon />
++                    </IconButton>
++                </Toolbar>
++            </AppBar>
 +
-+  // Call bootstrap when mounted
-+  bootstrapMfe(customProps.appId || 'job-management')
-+    .catch(err => console.error(`JobManagement: Bootstrap error during mount:`, err));
-   
-   // Create root once
-   const root = createRoot(domElement);
-===CHANGE_END===
++            {/* Sidebar Area */}
++            <Box sx={{ width: sidebarWidth, flexShrink: 0, pt: `64px`, height: '100vh', boxSizing: 'border-box', borderRight: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
++                {sidebarContent}
++            </Box>
++
++            {/* Main Content Area */}
++            <Box component="main" sx={{ flexGrow: 1, height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
++                <Toolbar /> {/* Spacer for AppBar */}
++                <Box sx={{ flexGrow: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
++                    {mainContent}
++                </Box>
++            </Box>
++
++            {/* Preferences Dialog (rendered but controlled by parent state) */}
++            {preferencesDialog}
++        </Box>
++    );
++};
++
++export default MainLayout;
++
 
-===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/test-app/src/main.tsx
-TYPE: modify
-DESCRIPTION: Add bootstrap implementation to test-app MFE
-DIFF:
---- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/test-app/src/main.tsx
-+++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/test-app/src/main.tsx
-@@ -5,12 +5,32 @@
- import React from 'react';
- import { createRoot } from 'react-dom/client';
- import TestApp from './TestApp';
-+import { bootstrapConfig } from 'shared';
- 
- /**
-  * Export the default component for ESM imports
-  */
- export default TestApp;
- 
-+/**
-+ * Bootstrap function for test-app MFE
-+ * Called by shell when mounting to ensure proper configuration
-+ */
-+export async function bootstrapMfe(mfeId: string) {
-+  console.log(`TestApp: Bootstrap called for ${mfeId}`);
-+  
-+  try {
-+    const result = await bootstrapConfig(mfeId);
-+    if (!result.success) {
-+      console.error(`TestApp: Bootstrap failed: ${result.error}`);
-+      return { success: false, error: result.error };
-+    }
-+    return { success: true, config: result.config };
-+  } catch (error) {
-+    console.error(`TestApp: Bootstrap error:`, error);
-+    return { success: false, error };
-+  }
-+}
-+
- /**
-  * Optional mount function for compatibility with different consumption patterns
-  * @param props - Properties including DOM element to mount into
-@@ -18,6 +38,10 @@
-  */
- export function mount(props: any) {
-   const { domElement, ...restProps } = props;
-+
-+  // Call bootstrap when mounted
-+  bootstrapMfe(restProps.appId || 'test-app')
-+    .catch(err => console.error(`TestApp: Bootstrap error during mount:`, err));
-   
-   // Create a root using React 18's createRoot API
-   const root = createRoot(domElement);
 ===CHANGE_END===
-
-===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/yaml-editor/src/main.tsx
-TYPE: modify
-DESCRIPTION: Add bootstrap implementation to yaml-editor MFE
-DIFF:
---- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/yaml-editor/src/main.tsx
-+++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/yaml-editor/src/main.tsx
-@@ -6,11 +6,31 @@
- import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
- import CssBaseline from '@mui/material/CssBaseline';
- import YamlEditor from './YamlEditor';
-+import { bootstrapConfig } from 'shared';
- 
- // Export the component
- export default YamlEditor;
- 
- /**
-+ * Bootstrap function for yaml-editor MFE
-+ * Called by shell when mounting to ensure proper configuration
-+ */
-+export async function bootstrapMfe(mfeId: string) {
-+  console.log(`YamlEditor: Bootstrap called for ${mfeId}`);
-+  
-+  try {
-+    const result = await bootstrapConfig(mfeId);
-+    if (!result.success) {
-+      console.error(`YamlEditor: Bootstrap failed: ${result.error}`);
-+      return { success: false, error: result.error };
-+    }
-+    return { success: true, config: result.config };
-+  } catch (error) {
-+    console.error(`YamlEditor: Bootstrap error:`, error);
-+    return { success: false, error };
-+  }
-+}
-+
-+/**
-  * Mount function for dynamic loading
-  * Includes all required providers following MFE Guidelines
-  */
-@@ -18,6 +38,10 @@
-   const { domElement, customProps = {} } = props;
-   
-   console.log('YamlEditor: Mounting with props:', customProps);
-+
-+  // Call bootstrap when mounted
-+  bootstrapMfe(customProps.appId || 'yaml-editor')
-+    .catch(err => console.error(`YamlEditor: Bootstrap error during mount:`, err));
-   
-   const root = createRoot(domElement);
-   
-===CHANGE_END===
-
 ===CHANGE_BEGIN===
 FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
 TYPE: modify
-DESCRIPTION: Update MFE mounting to call bootstrapConfig
+DESCRIPTION: Refactor App.tsx to use new layout component and custom hooks.
 DIFF:
 --- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
 +++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
-@@ -342,6 +342,17 @@
-             console.log(`App.tsx: Mount Effect - ESM Module loaded for ${appDef.id}`, module);
+@@ -1,22 +1,24 @@
+ /**
+  * /packages/shell/src/App.tsx
+  * Main shell application that orchestrates microfrontends
++ * --- Refactored to use MainLayout and custom hooks ---
+  */
+-import React, { useEffect, useState, useCallback, useRef } from 'react';
+-import * as ReactDOM from 'react-dom/client';
++import React, { useState, useCallback, useEffect } from 'react'; // Removed useEffect, useRef related to MFE mounting
+ import {
+     ThemeProvider,
+     CssBaseline,
+     Box,
+     CircularProgress,
+-    IconButton,
+     Typography,
+-    AppBar,
+-    Toolbar,
+ } from '@mui/material';
+ import { createTheme } from '@mui/material/styles';
+ import { BrowserRouter as Router } from 'react-router-dom';
+-import SettingsIcon from '@mui/icons-material/Settings';
++
++// Refactored components and hooks
++import MainLayout from './components/layout/MainLayout';
++import { useMfeOrchestrator } from './hooks/useMfeOrchestrator';
++import { useShellEvents } from './hooks/useShellEvents';
++
+ import { useShellConfig, ShellConfigProvider } from './contexts/ShellConfigContext';
+ import TabBar from './components/layout/TabBar';
+ // Ensure all needed types/values are imported from shared (including configTypes)
+@@ -28,10 +30,10 @@
+ const theme = createTheme({
+     palette: {
+         primary: { main: '#1976d2' }, //
+-        secondary: { main: '#dc004e' },
++        // secondary: { main: '#dc004e' }, // Removed as not obviously used
+         background: { default: '#f5f7fa' },
+     },
+     typography: {
+@@ -42,63 +44,32 @@
+     },
+     
+ });
+-class ErrorBoundary extends React.Component<{ children: React.ReactNode, message?: string }, { hasError: boolean, error: any }> {
+-   constructor(props: { children: React.ReactNode, message?: string }) {
+-     super(props);
+-     this.state = { hasError: false, error: null };
+-   }
+-   static getDerivedStateFromError(error: any) { return { hasError: true, error };
+-   }
+-   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) { console.error("ErrorBoundary caught:", error, errorInfo);
+-   }
+-   render() {
+-     if (this.state.hasError) {
+-       return (
+-         <Box sx={{ p: 3, textAlign: 'center', color: 'error.main' }}>
+-           <h2>{this.props.message || 'Something wrong'}</h2>
+-           <p>There was an error loading this part of the application.</p>
+-           <details style={{ whiteSpace: 'pre-wrap', marginTop: '1em', textAlign: 'left' }}>
+-             <summary>Error Details</summary>
+-             {this.state.error?.toString()}
+-           </details>
+-           <button onClick={() => this.setState({ hasError: false, error: null })}>Try again</button>
+-           {' '}
+-           <button onClick={() => window.location.reload()}>Reload Page</button>
+-         </Box>
+-       );
+-     }
+-     return this.props.children;
+-   }
+-}
++// NOTE: Global ErrorBoundary might still be useful around AppContent,
++// but MfeErrorBoundary is now in useMfeOrchestrator.tsx
  
-             try {
-+                // Call bootstrap function if MFE supports it
-+                if (module.bootstrapMfe && typeof module.bootstrapMfe === 'function') {
-+                    console.log(`Shell: Calling bootstrapMfe for ${appDef.id}`);
-+                    try {
-+                        await module.bootstrapMfe(appDef.id);
-+                    } catch (bootstrapError) {
-+                        console.error(`Shell: Error bootstrapping MFE ${appDef.id}:`, bootstrapError);
-+                    }
-+                }
-+                
-                 let unmountFn: (() => void) | undefined = undefined;
-                 if (module.mount && typeof module.mount === 'function') {
-                     console.log(`App.tsx: Mount Effect - Mounting ${appDef.id} via module.mount()...`);
-===CHANGE_END===
-
-===CHANGE_BEGIN===
-FILE: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/contexts/ConfigContext.tsx
-TYPE: modify
-DESCRIPTION: REMOVE API readiness checks/retries, trusting bootstrap process
-DIFF:
---- a/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/contexts/ConfigContext.tsx
-+++ b/Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/contexts/ConfigContext.tsx
-@@ -102,29 +102,8 @@
-   const loadConfigs = useCallback(async () => {
-     setLoading(true);
-     setError(null);
--    // --- UPDATED CHECK ---
--    if (!checkApiServiceReady()) { // Check readiness directly from apiService
--        console.log("ConfigContext: Waiting for API service to be ready before loading configs...");
--        // Optionally set a specific loading message or just return
--        // setError("Waiting for shell configuration..."); // Or handle differently
--        setLoading(false); // Ensure loading is stopped if we return early
--        return; // Don't proceed if shell isn't ready
--    }
--    // --- END CHECK ---
--    console.log(`ConfigContext: Shell is ready. Proceeding to load configs for ${configType}.`);
-+    console.log(`ConfigContext: Proceeding to load configs for ${configType} (assuming bootstrap complete).`);
-     try {
--      // Try to ensure API is ready with retry logic
--      if (!checkApiServiceReady()) {
--        console.log("ConfigContext: API service not ready, will retry...");
--        setError("API service not configured yet. Retrying...");
--        
--        // Retry a few times
--        let retries = 5;
--        while (retries > 0 && !checkApiServiceReady()) {
--          await new Promise(resolve => setTimeout(resolve, 500));
--          retries--;
+ function AppContent() {
++    // --- Core State ---
+     const { config, loading, error, availableApps } = useShellConfig();
+     const [activeFrameId, setActiveFrameId] = useState<string | null>(null);
+     const [activeConfigId, setActiveConfigId] = useState<string | null>(null);
+     const [isPrefsDialogOpen, setIsPrefsDialogOpen] = useState<boolean>(false);
+-    const mountedModulesRef = useRef<Record<string, { unmount: () => void }>>({});
+-    const isMountedRef = useRef(true);
+-    const mfeContainerRef = useRef<HTMLDivElement | null>(null);
+-    const previousActiveFrameIdRef = useRef<string | null>(null);
+-
+-    // Set up event bus bridge for iframe communication
++    // State related to MFE mounting (mountedModulesRef) is moved to useMfeOrchestrator
++    // State/Refs related to event handling moved to useShellEvents
++
++    // --- Callbacks ---
++    // Callback for MFE Orchestrator hook to handle internal config navigation
++    const handleConfigNavigation = useCallback((action: 'navigateTo' | 'back', target?: string) => {
++        console.log(`AppContent: handleConfigNavigation called. Action=${action}, Target=${target}`);
++        if (action === 'navigateTo' && target) {
++            setActiveConfigId(target);
++        } else if (action === 'back') {
++            setActiveConfigId(null);
++        }
++    }, []); // No dependencies, relies on closure
++
++    // Callback for Shell Events hook
++    const handleNavigationRequest = useCallback((payload: NavigationRequestPayload) => {
++        handleConfigNavigation(payload.action, payload.target);
++    }, [handleConfigNavigation]); // Dependency needed
++
++    // Callback for YAML Edit requests
++    const handleYamlEditRequest = useCallback((detail: EventDetail) => {
++        // --- TODO: Implement or move YAML edit request logic ---
++        // This complex logic involving dynamic import and mounting of yaml-editor
++        // might also belong in the useMfeOrchestrator or a dedicated hook/service.
++        // For now, just logging it.
++        console.log("AppContent: Received config:edit:yaml request (logic needs refactoring):", detail);
++        const { configType, configId, frameId: requestedFrameId, readOnly } = detail.payload;
++        const frameId = requestedFrameId || activeFrameId;
++
++        // Placeholder for the complex logic from original App.tsx lines ~499-518
++        alert(`YAML Editor requested for ${configType}:${configId} in frame ${frameId}`);
++
++    }, [activeFrameId]); // Dependency needed
++
++    // --- Custom Hooks ---
++    useShellEvents({ onNavigationRequest: handleNavigationRequest, onYamlEditRequest: handleYamlEditRequest });
++    const { MfeContainer } = useMfeOrchestrator({
++        activeFrameId,
++        config,
++        availableApps,
++        onConfigNavigate: handleConfigNavigation // Pass navigation handler
++    });
++
++    // --- Existing Effects and Callbacks (Simplified) ---
+     useEffect(() => {
+-        const bridge = setupEventBusBridge(window);
+-        return () => bridge.tearDown();
+-    }, []);
+-    // Effect to handle component unmount cleanup
+-    useEffect(() => {
+-        isMountedRef.current = true;
+-        return () => {
+-            isMountedRef.current = false;
+-            console.log("AppContent unmounting. Cleaning up all mounted modules.");
+-            Object.entries(mountedModulesRef.current).forEach(([frameId, moduleInstance]) => {
+-                console.log(`AppContent unmount: Cleaning up module for frame ${frameId}`);
+-                if (moduleInstance?.unmount) { // Check if unmount exists
+-                    try { moduleInstance.unmount(); } catch (e) { console.error(`Error unmounting ${frameId} on AppContent cleanup:`, e); }
+-                }
+-            });
+-            mountedModulesRef.current = {};
+-        };
+-    }, []);
+-
+-    // Preferences dialog handlers
+-    const handleOpenPrefsDialog = useCallback(() => setIsPrefsDialogOpen(true), []);
+-    const handleClosePrefsDialog = useCallback(() => setIsPrefsDialogOpen(false), []);
+-
+-    // Helper function to load a specific app into a frame
+-    const loadFrame = useCallback((frameId: string, appId: string) => {
+-        console.log(`Shell: loadFrame helper called for frame ${frameId}, app ${appId}`);
+-        const appDef = availableApps?.find(app => app.id === appId);
+-        if (!appDef) {
+-            console.error(`Shell: App ${appId} not found in availableApps`);
+-            return;
 -        }
--        
--        if (!checkApiServiceReady()) {
--          throw new Error("API service not configured after retries. Try refreshing the page.");
+-        if (activeFrameId !== frameId) {
+-            setActiveFrameId(frameId);
 -        }
--        
--        // Clear error if we eventually succeed
--        setError(null);
--      }
--      
--      console.log(`ConfigContext: API service is ready. Proceeding to load configs for ${configType}.`);
--      
-       const response = await apiService.getConfigs(configType);
-       setConfigs(response || []);
-       // Optionally emit an event that the list was updated
-@@ -251,24 +230,8 @@
-     if (!currentConfig) {
-       setError('No configuration selected to save'); setLoading(false); return null;
-     }
--    
-     const isNew = !currentConfig.id || currentConfig.id === 'new' || currentConfig.id === '';
+-    }, [availableApps, activeFrameId]);
+-    // Dependency on activeFrameId removed as setActiveFrameId is stable
+-
+-    // Effect to manage activeFrameId based on loaded config
+-    useEffect(() => {
++        // Effect to set the initial activeFrameId based on loaded config
+         if (!loading && !error && config?.frames) {
+             const sortedFrames = [...config.frames].sort((a, b) => a.order - b.order);
+             const currentFrameIsValid = activeFrameId ? sortedFrames.some(f => f.id === activeFrameId) : false;
  
--    // Try to ensure API is ready with retry logic
--    if (!checkApiServiceReady()) {
--        console.log("ConfigContext: API service not ready before save, will retry...");
--        
--        // Retry a few times before giving up
--        let retries = 5;
--        while (retries > 0 && !checkApiServiceReady()) {
--          await new Promise(resolve => setTimeout(resolve, 500));
--          retries--;
+             if (sortedFrames.length > 0) {
+                 // Set initial frame only if none is active or the current one is no longer valid
+-                if ((!activeFrameId || !currentFrameIsValid) && isMountedRef.current) {
++                if (!activeFrameId || !currentFrameIsValid) {
+                     setActiveFrameId(sortedFrames[0].id);
+                 }
+             } else if (activeFrameId !== null) {
+@@ -110,61 +81,24 @@
+                 // Config loaded but has no frames array, clear active frame
+                 setActiveFrameId(null);
+             }
+-    // Depend only on external data influencing the logic
+     }, [config, loading, error, activeFrameId]);
+-
+-    // Effect for cleaning up the previous MFE when activeFrameId changes
+-    useEffect(() => {
+-        const frameIdToCleanUp = previousActiveFrameIdRef.current;
+-        const currentFrameId = activeFrameId; // Capture current value
+-        previousActiveFrameIdRef.current = currentFrameId; // Update ref for next run
+-
+-        if (frameIdToCleanUp && frameIdToCleanUp !== currentFrameId) {
+-            const moduleToUnmount = mountedModulesRef.current[frameIdToCleanUp];
+-            if (moduleToUnmount?.unmount) {
+-                console.log(`App.tsx: Cleanup Effect - Scheduling unmount for previous frame: ${frameIdToCleanUp}`);
+-                // Use requestAnimationFrame for deferral to avoid potential conflicts
+-                requestAnimationFrame(() => {
+-                    // Double-check if the module hasn't been replaced in the meantime
+-                    if (mountedModulesRef.current[frameIdToCleanUp] === moduleToUnmount) {
+-                        console.log(`App.tsx: Cleanup Effect - Executing deferred unmount for ${frameIdToCleanUp}`);
+-                        try {
+-                            moduleToUnmount.unmount();
+-                        } catch (err) {
+-                            console.error(`App.tsx: Cleanup Effect - Error during deferred unmount for frame ${frameIdToCleanUp}:`, err);
+-                        }
+-                        // Clean up the reference *after* unmounting
+-                        delete mountedModulesRef.current[frameIdToCleanUp];
+-                        console.log(`App.tsx: Cleanup Effect - Removed ref for ${frameIdToCleanUp}`);
+-                    } else {
+-                        console.log(`App.tsx: Cleanup Effect - Module for ${frameIdToCleanUp} changed before deferred unmount could execute.`);
+-                        // If it changed, the new effect should handle its cleanup. We still remove the old ref.
+-                        delete mountedModulesRef.current[frameIdToCleanUp];
+-                    }
+-                });
+-            } else {
+-                // If no module or unmount function, just remove the reference
+-                console.log(`App.tsx: Cleanup Effect - No module or unmount function found for ${frameIdToCleanUp}, removing ref.`);
+-                delete mountedModulesRef.current[frameIdToCleanUp];
+-            }
 -        }
--    }
--    
--    if (!checkApiServiceReady()) {
--        console.error("ConfigContext: Cannot save config, API service is not ready after retries.");
--        setError("Cannot save: Shell configuration not ready. Please wait or refresh.");
--        setLoading(false);
--        return null;
--    }
-     // --- END CHECK ---
-     const effectiveId = isNew ? idFromEditor?.trim() : currentConfig.id;
-===CHANGE_END===
+-    }, [activeFrameId]);
+-    // Rerun only when activeFrameId changes
+-
++    // MFE cleanup is now handled within useMfeOrchestrator
+ 
+     // Handler for tab changes
+     const handleTabChange = useCallback((_event: React.SyntheticEvent, newFrameId: string) => {
+         console.log(`App.tsx: handleTabChange called. New frame ID: ${newFrameId}`);
+-        if (isMountedRef.current && newFrameId !== activeFrameId) {
++        if (newFrameId !== activeFrameId) {
+             setActiveFrameId(newFrameId);
+             setActiveConfigId(null); // Reset active config ID when changing tabs
+         }
+     }, [activeFrameId]);
+     // Dependency on activeFrameId is correct here
+ 
+-    // Effect for mounting the current MFE
++    // Preferences dialog handlers
++    const handleOpenPrefsDialog = useCallback(() => setIsPrefsDialogOpen(true), []);
++    const handleClosePrefsDialog = useCallback(() => setIsPrefsDialogOpen(false), []);
++
++    // --- MFE Mounting Effect is now inside useMfeOrchestrator ---
+     /*
+     useEffect(() => {
+         let isEffectActive = true;
+@@ -286,71 +220,6 @@
+     }, [activeFrameId, availableApps, config, error, loading]);// Dependencies remain the same
+     */
+ 
+-    // Event bus listener for navigation requests
+-    useEffect(() => {
+-        const handleNavigationRequest = (detail: any) => {
+-            if (detail?.payload?.action) {
+-                const { action, target, from } = detail.payload;
+-                 console.log(`Shell received navigation request: Action=${action}, Target=${target}, From=${from || 'unknown'}`);
+-                 if (action === 'navigateTo' && target) {
+-                    setActiveConfigId(target);
+-                } else if (action === 'back') {
+-                    setActiveConfigId(null);
+-                }
+-            } else {
+-                 console.warn("Shell received navigation request with invalid payload:", detail);
+-            }
+-        };
+-        // **Fix for TS2304 START** Use EventTypes enum
+-        const unsubscribe = eventBus.subscribe(EventTypes.NAVIGATION_REQUEST, handleNavigationRequest);
+-        // **Fix for TS2304 END**
+-        return () => unsubscribe();
+-    }, []);
+-    // No dependencies needed
+-
+-    // Event bus listener for in-place YAML editor requests
+-    useEffect(() => {
+-        const handleYamlEditorRequest = (detail: any) => {
+-            if (detail?.payload?.inPlace && detail.payload.configType && detail.payload.configId) {
+-                const { configType, configId, frameId: requestedFrameId, readOnly } = detail.payload;
+-                console.log(`Shell received request to load YAML Editor in-place for ${configType}:${configId}`);
+-
+-                const yamlEditorApp = availableApps?.find(app => app.id === 'yaml-editor');
+-                if (!yamlEditorApp) { console.error("Shell: Cannot find yaml-editor in availableApps"); return; }
+-
+-                const frameId = requestedFrameId || activeFrameId;
+-                if (!frameId) { console.error("Shell: No valid frame ID for yaml-editor mounting"); return; }
+-
+-                const containerElement = document.getElementById(`mfe-container-${frameId}`);
+-                if (!containerElement) { console.error(`Shell: Cannot find container element for frame ${frameId}`); return; }
+-
+-                const currentFrame = config?.frames?.find(f => f.id === frameId);
+-                const currentAppId = currentFrame?.assignedApps?.[0]?.appId;
+-
+-                const currentModule = mountedModulesRef.current[frameId];
+-                if (currentModule?.unmount) {
+-                    try {
+-                        console.log(`Shell: Unmounting current app in frame ${frameId} to load yaml-editor`);
+-                        currentModule.unmount();
+-                    } catch (e) { console.error("Error unmounting current app:", e); }
+-                }
+-                delete mountedModulesRef.current[frameId];
+-                // Remove ref after unmount attempt
+-                containerElement.innerHTML = '';
+-                // Clear container
+-
+-                console.log(`Shell: Loading yaml-editor from ${yamlEditorApp.url}`);
+-                import(/* @vite-ignore */ yamlEditorApp.url)
+-                    .then(module => {
+-                        if (!module || (!module.mount && !module.default)) { throw new Error("YAML Editor module invalid"); }
+-                        const mountFn = module.mount || ((props: any) => { /* ... default mount logic ... */ });
+-                        const yamlEditorProps = {
+-                            domElement: containerElement,
+-                            customProps: {
+-                                configType, configId, readOnly: readOnly || false,
+-                                onBack: () => {
+-                                     console.log(`Shell: YAML Editor back navigation, restoring ${currentAppId || 'nothing'}`);
+-                                     const yamlModule = mountedModulesRef.current[frameId];
+-                                     if (yamlModule?.unmount) { try { yamlModule.unmount(); } catch(e) {} delete mountedModulesRef.current[frameId]; }
+-                                     if (currentAppId) loadFrame(frameId, currentAppId); // loadFrame needs definition if used
+-                                     else containerElement.innerHTML = '';
+-                                }
+-                            }
+-                        };
+-                        try {
+-                            const mountedYamlEditor = mountFn(yamlEditorProps);
+-                            mountedModulesRef.current[frameId] = { unmount: mountedYamlEditor?.unmount || (() => {}) };
+-                        } catch (e) { /* ... error handling ... */ }
+-                    })
+-                    .catch(err => { /* ... error handling ... */ });
+-            }
+-        };
+-        console.log("Shell: Subscribing to config:edit:yaml event");
+-        const unsubscribe = eventBus.subscribe('config:edit:yaml', handleYamlEditorRequest);
+-        return () => { console.log("Shell: Unsubscribing from config:edit:yaml event"); unsubscribe(); };
+-    }, [availableApps, config?.frames, activeFrameId]); // Removed loadFrame dependency
+-
+-
+-    // Helper function to render content
+-    const renderActiveFrameContent = () => {
+-        console.log(`App.tsx: renderActiveFrameContent rendering container div for activeFrameId: ${activeFrameId}`);
++    // --- Helper function to render sidebar content (TabBar) ---
++    const renderSidebarContent = () => {
+         if (loading) return <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}><CircularProgress /></Box>;
+         if (error) return <Box sx={{ flexGrow: 1, p: 3 }}><Typography color="error">Error loading shell config: {error}</Typography></Box>;
+         if (!config?.frames || config.frames.length === 0) return <Typography sx={{ p: 3, fontStyle: 'italic' }}>No frames configured.
+@@ -358,43 +235,25 @@
+ Open Preferences (gear icon) to add tabs.</Typography>;
+         // if (!activeFrameId) return <Typography sx={{ p: 3, fontStyle: 'italic' }}>Initializing or no frame selected...</Typography>; // Handled by MfeContainer now
+ 
+-        return (
+-            <ErrorBoundary message={`Error loading application for frame ${activeFrameId}`}>
+-                <div
+-                    ref={mfeContainerRef}
+-                    // *** THIS IS THE LINE TO CHANGE ***
+-                    // Only key by frame ID to prevent remount on internal navigation
+-                    key={activeFrameId}
+-                    // *** END OF CHANGE ***
+-                    id={`mfe-container-${activeFrameId}`}
+-                    style={{height: '100%', width: '100%', overflow: 'auto'}}
+-                />
+-            </ErrorBoundary>
+-        );
+-    };
++         // Render TabBar if frames exist
++         return (
++            <TabBar
++                frames={config.frames}
++                activeFrameId={activeFrameId}
++                onTabChange={handleTabChange}
++                width={verticalTabBarWidth} // Pass width
++            />
++         );
++    };
+ 
+     const verticalTabBarWidth = 200;
+ 
+     return (
+-        <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+-            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+-                <Toolbar>
+-                    <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'baseline' }}>
+-                        <Typography variant="h5" noWrap component="div" sx={{ mr: 2 }}>Visual Prompt Studio</Typography>
+-                        <Typography variant="subtitle1" noWrap component="div" sx={{ opacity: 0.8 }}>C4H Editor</Typography>
+-                    </Box>
+-                    <IconButton color="inherit" aria-label="open preferences" onClick={handleOpenPrefsDialog} edge="end">
+-                        <SettingsIcon />
+-                    </IconButton>
+-                </Toolbar>
+-            </AppBar>
+-
+-            <Box sx={{
+-                width: verticalTabBarWidth, flexShrink: 0, pt: `64px`, height: '100vh',
+-                boxSizing: 'border-box', borderRight: 1, borderColor: 'divider', bgcolor: 'background.paper'
+-            }}>
+-                {!loading && !error && config?.frames && config.frames.length > 0 ?
+-                 (
+-                    <TabBar frames={config.frames} activeFrameId={activeFrameId} onTabChange={handleTabChange} width={verticalTabBarWidth} />
+-                ) : (
+-                    <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+-                        {loading && <CircularProgress sx={{mb: 1}} size={20}/>}
+-                        <Typography sx={{p:1, color: 'text.secondary', fontSize: '0.9rem'}}>{loading ? 'Loading Tabs...' : 'No Tabs'}</Typography>
+-                    </Box>
+-                )}
+-            </Box>
+-
+-            <Box component="main" sx={{ flexGrow: 1, height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+-                <Toolbar />
+-                <Box sx={{ flexGrow: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+-                    {renderActiveFrameContent()}
+-                </Box>
+-            </Box>
+-
+-            <PreferencesDialog open={isPrefsDialogOpen} onClose={handleClosePrefsDialog} />
+-        </Box>
++        <MainLayout
++            sidebarWidth={verticalTabBarWidth}
++            sidebarContent={renderSidebarContent()}
++            mainContent={<MfeContainer />} // Render the container component from the hook
++            preferencesDialog={<PreferencesDialog open={isPrefsDialogOpen} onClose={handleClosePrefsDialog} />}
++            onOpenPreferences={handleOpenPrefsDialog}
++        />
+     );
+ }
+ 
+@@ -405,7 +264,7 @@
+                 <Router>
+                     <AppContent />
+                 </Router>
+-            </ShellConfigProvider>
++           </ShellConfigProvider>
+         </ThemeProvider>
+     );
+ }
+ ===CHANGE_END===

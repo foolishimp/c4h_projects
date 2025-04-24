@@ -2,7 +2,7 @@
 
 # Project settings
 project:
-  path: "/Users/jim/src/apps/c4h_editor/c4h-micro"
+  path: "/Users/jim/src/apps/c4h .... " #use correct path to your project
   workspace_root: "workspaces"
 
 # Intent description - this is an example place holder for what the actual work order would look like
@@ -84,14 +84,10 @@ intent:
 
 # LLM configuration
 llm_config:
-  default_provider: "anthropic"
-  default_model: "claude-3-7-sonnet-20250219"
-  
   agents:
     discovery:
       provider: "anthropic"
       model: "claude-3-5-sonnet-20241022"
-
       # Broadly include the directories that need to give context and scope to the LLM
       tartxt_config:
         input_paths:
@@ -102,42 +98,12 @@ llm_config:
         exclusions:
           - "**/node_modules/**"
           - "**/.git/**"
-    
     solution_designer:
       provider: "anthropic"
       model: "claude-3-7-sonnet-20250219" 
       temperature: 0.7
       extended_thinking:
         enabled: true
-        budget_tokens: 32000
-    
-    coder:
-      provider: "anthropic"
-      model: "claude-3-7-sonnet-20250219"
-      temperature: 0
-      backup_enabled: true
+        budget_tokens: 32000 
 
-# Runtime configuration
-runtime:
-  workflow:
-    storage:
-      enabled: true
-      root_dir: "workspaces/workflows"
-      format: "yymmdd_hhmm_{workflow_id}"
-    error_handling:
-      ignore_storage_errors: true
-      log_level: "ERROR"
 
-# Backup configuration
-backup:
-  enabled: true
-  path: "workspaces/backups"
-
-# Logging configuration
-logging:
-  level: "INFO"
-  format: "structured"
-  agent_level: "DEBUG"
-  truncate:
-    prefix_length: 30
-    suffix_length: 30
