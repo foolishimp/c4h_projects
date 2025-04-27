@@ -158,53 +158,53 @@ Here's a complete template combining both system and intent configurations:
 
 ```yaml
 # Work Order Configuration
+workorder:
+   # Project settings
+   project:
+   path: "/path/to/your/project"  
+   workspace_root: "workspaces"
 
-# Project settings
-project:
-  path: "/path/to/your/project"  
-  workspace_root: "workspaces"
-
-# Intent description (the actual work order)
-intent:
-  description: |
-    # [TITLE OF WORK ORDER]
-    
-    ## Goal
-    [CLEAR STATEMENT OF END GOAL]
-    
-    ## Current Implementation Context
-    - [DESCRIPTION OF CURRENT CODE]
-    - [RELEVANT PATTERNS OR CONVENTIONS]
-    - [ISSUES WITH CURRENT IMPLEMENTATION]
-    
-    ## Required Changes
-    1. [FIRST CHANGE]
-    2. [SECOND CHANGE]
-    3. [THIRD CHANGE]
-    
-    **READ** and **ADHERE** to the principles outlined in the relevant design documents.
-    
-    Implementation Requirements:
-    - [REQUIREMENT 1]
-    - [REQUIREMENT 2]
-    - [REQUIREMENT 3]
-    - [REQUIREMENT 2]
-    - [REQUIREMENT 3]
-    
-    Design Principles to Follow:
-    - [PRINCIPLE 1]
-    - [PRINCIPLE 2]
-    
-    ## Files to Modify
-    - [FILE PATH 1] - [BRIEF DESCRIPTION OF CHANGES NEEDED]
-    - [FILE PATH 2] - [BRIEF DESCRIPTION OF CHANGES NEEDED]
+   # Intent description (the actual work order)
+   # sub headings beneath description are only for clarity to the LLM
+   intent:
+   description: |
+      # [TITLE OF WORK ORDER]
+      
+      ## Goal
+      [CLEAR STATEMENT OF END GOAL]
+      
+      ## Current Implementation Context
+      - [DESCRIPTION OF CURRENT CODE]
+      - [RELEVANT PATTERNS OR CONVENTIONS]
+      - [ISSUES WITH CURRENT IMPLEMENTATION]
+      
+      ## Required Changes
+      1. [FIRST CHANGE]
+      2. [SECOND CHANGE]
+      3. [THIRD CHANGE]
+      
+      **READ** and **ADHERE** to the principles outlined in the relevant design documents.
+      
+      Implementation Requirements:
+      - [REQUIREMENT 1]
+      - [REQUIREMENT 2]
+      - [REQUIREMENT 3]
+      - [REQUIREMENT 2]
+      - [REQUIREMENT 3]
+      
+      Design Principles to Follow:
+      - [PRINCIPLE 1]
+      - [PRINCIPLE 2]
+      
+      ## Files to Modify
+      - [FILE PATH 1] - [BRIEF DESCRIPTION OF CHANGES NEEDED]
+      - [FILE PATH 2] - [BRIEF DESCRIPTION OF CHANGES NEEDED]
 
 # LLM configuration
 llm_config:
   agents:
     discovery:
       tartxt_config:
-        script_path: "/path/to/tartxt.py"
         input_paths:
           - "path/to/analyze"
         exclusions:
@@ -219,31 +219,6 @@ llm_config:
         enabled: true
         budget_tokens: 32000
     
-    coder:
-      provider: "anthropic"
-      model: "claude-3-7-sonnet-20250219"
-      temperature: 0
-      backup_enabled: true
-
-# Runtime configuration
-runtime:
-  workflow:
-    storage:
-      enabled: true
-      root_dir: "workspaces/workflows"
-      format: "yymmdd_hhmm_{workflow_id}"
-      subdirs:
-        - "events"
-        - "config"
-      error_handling:
-        ignore_storage_errors: true
-        log_level: "ERROR"
-
-# Logging configuration
-logging:
-  level: "INFO"
-  format: "structured"
-  agent_level: "DEBUG"
 ```
 
 ## Work Order Examples
@@ -425,11 +400,6 @@ When the C4H Agent System processes your work order, it follows this sequence:
    - Makes precise modifications to the codebase
    - Creates new files if needed
    - Preserves existing functionality
-
-4. **Verification Phase** (if configured)
-   - Validates changes against requirements
-   - Performs basic testing
-   - Ensures consistency of modifications
 
 ## Tips for Optimal Results
 
