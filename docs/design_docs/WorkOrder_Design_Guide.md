@@ -24,11 +24,11 @@ project:
 
 llm_config:  
   agents:  
-    discovery:  
+    discovery_agent:  
       tartxt_config:  
         input_paths:  
           - "path/to/folder/to/analyze"
-        exclusions:  
+        exclusions:
           - "**/__pycache__/**"  
           - "**/.git/**"
 
@@ -189,11 +189,14 @@ workorder:
 # This section is merged with the base system_config.yml  
 llm_config:  
   agents:  
-    discovery:  
-      tartxt_config:  
-        input_paths:  
-          # Example: Include project source and a specific design doc  
-          - "src/" # Relative path within the project  
+    discovery_agent:
+      agent_type: "generic_single_shot"
+      persona_key: "discovery"
+      name: "discovery_phase"
+      tartxt_config:
+        input_paths:
+          # Example: Include project source and a specific design doc
+          - "src/" # Relative path within the project
           - "/Users/jim/src/apps/c4h_projects/docs/design_docs/Relevant_Design_Doc.md" # Absolute path for external doc  
         exclusions:  
           - "**/__pycache__/**"  
@@ -201,9 +204,12 @@ llm_config:
 
     solution_designer:  
       # Example: Override model or temperature for this specific job  
-      provider: "anthropic"  
-      model: "claude-3-7-sonnet-20250219"  
-      temperature: 1  
+      agent_type: "generic_single_shot"
+      persona_key: "solution_designer"
+      name: "solution_design_phase"
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-20250219"
+      temperature: 1
       extended_thinking:  
         enabled: true  
         budget_tokens: 32000
@@ -365,7 +371,7 @@ When the C4H Agent System processes your work order, it follows this sequence:
 
 1. **Discovery Phase**  
    * Analyzes project structure and codebase based on tartxt_config.input_paths.  
-   * Identifies relevant files and patterns.  
+   * Identifies relevant files and patterns.
    * Creates a codebase understanding model (the tartxt output).  
 2. **Solution Design Phase**  
    * Interprets your intent description.  
