@@ -518,4 +518,23 @@ tartxt.py \
  -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_editor_front_shell.txt
 
 
+tartxt.py \
+  /Users/jim/src/apps/c4h_ai_dev/c4h_agents \
+  /Users/jim/src/apps/c4h_ai_dev/c4h_services \
+  /Users/jim/src/apps/c4h_ai_dev/config \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**,**/*.toml \
+  -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_ai_full.txt
 
+tartxt.py \
+  /Users/jim/src/apps/c4h_ai_dev/config_teams_0502 \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**,**/*.toml,**/*.md" \
+  -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_ai_config.txt
+
+
+### Reference documents
+/Users/jim/src/apps/c4h_projects/docs/design_docs/Agent_Design_Principles_v2.md
+/Users/jim/src/apps/c4h_projects/docs/requirements_docs/c4h_orchestration_enhancements_0430.md
+/Users/jim/src/apps/c4h_projects/docs/design_docs/Config_Design_Principles.md
+
+## v3.1 Requirements Doc
+/Users/jim/src/apps/c4h_projects/docs/requirements_docs/c4h_orchestration_refactor_0504.md

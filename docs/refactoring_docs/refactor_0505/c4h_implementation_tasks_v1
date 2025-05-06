@@ -1,0 +1,91 @@
+# **C4H Refactoring: Implementation Task List**
+
+This task list outlines the key implementation steps required to fully align the codebase (c4h\_ai\_full\_010.txt) with the target architecture defined in the "C4H System: Philosophical Goals & Architectural Requirements" document.
+
+**I. Orchestration Enhancements (Prefect Flows & Tasks)**
+
+1. **Implement Minimal Routing Evaluation:**  
+   * **Requirement(s):** REQ-METHOD-01, REQ-DET-03 (Simplified Scope)  
+   * **Task:** Modify c4h\_services/src/intent/impl/prefect/tasks.py::evaluate\_routing\_task to support only essential routing conditions for team chaining and simple conditional branching based on the *final* task's result within a team.  
+     * The condition field in YAML routing rules should primarily check the overall success/failure of the preceding team (e.g., based on the success status of its last task) or a specific boolean field within that task's result\_data (e.g., task:\<last\_task\_name\>.result\_data.test\_passed \== True).  
+     * Support basic boolean comparison operators: \== and \!=.  
+     * Implement safe parsing and evaluation logic within evaluate\_routing\_task for these simple conditions (e.g., "task:\<task\_name\>.success \== True" or "task:\<task\_name\>.result\_data.field \== \<value\>").  
+     * **Remove** any complex DSL parsing (multiple operators, context checks beyond simple fields) and remove legacy condition evaluation from c4h\_services/src/orchestration/team.py. The orchestrator's role is simplified to checking the final outcome flag/status of a team.  
+   * **Files:** tasks.py, team.py  
+   * **Example YAML Syntax (Simplified):**  
+     routing:  
+       rules:  
+         \# Example based on final task success/failure of the preceding team  
+         \- condition: "task:\<last\_task\_name\_in\_prev\_team\>.success \== True"  
+           next\_team: "NextTeam"  
+         \# Example based on specific boolean output field (like D.test?)  
+         \- condition: "task:D\_task\_name.result\_data.test\_passed \== True"  
+           next\_team: null \# Exit  
+         \- condition: "task:D\_task\_name.result\_data.test\_passed \== False"  
+           next\_team: "TeamA" \# Loop back  
+       default: "FallbackTeam" \# Default if conditions fail or aren't met
+
+2. **Enforce Immutable Context Updates:**  
+   * **Requirement(s):** REQ-DET-05  
+   * **Task:** Refactor the main loop in c4h\_services/src/intent/impl/prefect/workflows.py::run\_declarative\_workflow to ensure current\_context is updated immutably between steps using dictionary unpacking (next\_context \= {\*\*current\_context, \*\*context\_updates}). Verify context passed to subflows/tasks is treated as read-only or copied.  
+   * **Files:** workflows.py  
+3. **Implement Loop (type: "loop") Handling:**  
+   * **Requirement(s):** REQ-METHOD-01, REQ-DET-03  
+   * **Task:** Add logic to run\_declarative\_workflow to detect steps configured with type: "loop". Implement iteration over the specified context collection (iterate\_on), inject the loop\_variable into a *new* context for each iteration, execute the tasks defined in the loop body using run\_agent\_task or execute\_team\_subflow for each iteration, and manage results/context according to defined conventions.  
+   * **Files:** workflows.py  
+4. **Implement Fan-Out/Fan-In (next\_team: \[...\], type: "concentrator"):**  
+   * **Requirement(s):** REQ-METHOD-01, REQ-DET-03  
+   * **Task:**  
+     * **Fan-Out:** Modify evaluate\_routing\_task to return lists for next\_team\_id. Modify run\_declarative\_workflow to detect list results and use Prefect's concurrency features (e.g., map) to dispatch parallel execution of execute\_team\_subflow.  
+     * **Fan-In:** Add logic to run\_declarative\_workflow to detect steps with type: "concentrator". Implement state management to collect results from upstream parallel branches (identified by source\_teams/source\_step). Implement logic for completion\_condition (start with type: "count") and aggregation\_strategy (start with type: "list").  
+   * **Files:** workflows.py, tasks.py
+
+**II. Skill Framework Formalization**
+
+5. **Define Skill Contract & Result Type:**  
+   * **Requirement(s):** REQ-ORG-03, REQ-DET-04  
+   * **Task:** Define the SkillResult dataclass (with success, value, error, metrics) in c4h\_agents/agents/types.py or a new skills/types.py. Define a formal SkillProtocol or BaseSkill class (in skills/base\_skill.py) specifying the execute(\*\*kwargs) \-\> SkillResult method signature and enforcing the Totality principle (handling expected errors internally).  
+   * **Files:** types.py (or new skills/types.py), skills/base\_skill.py  
+6. **Implement Skill Registry & Invocation:**  
+   * **Requirement(s):** REQ-ORG-03  
+   * **Task:** Implement the dynamic skill lookup and invocation logic within BaseAgent (e.g., in \_invoke\_skill). This method should parse a skill identifier string (e.g., "module.Class.method"), import the module, instantiate the class (passing necessary config), call the specified method with provided kwargs, and return the SkillResult. Update GenericSkillAgent (and potentially GenericLLMAgent/GenericOrchestratorAgent if they call skills directly) to use this invocation mechanism based on configuration like { skill: "...", skill\_params: {...} }.  
+   * **Files:** base\_agent.py, generic.py  
+7. **Refactor Existing Skills:**  
+   * **Requirement(s):** REQ-ORG-03, REQ-DET-04  
+   * **Task:** Modify existing skill classes (e.g., AssetManager, SemanticMerge, SemanticIterator, SemanticExtract) to adhere to the new SkillProtocol/BaseSkill contract, ensuring their primary execution method returns a SkillResult object and handles internal errors gracefully.  
+   * **Files:** skills/asset\_manager.py, skills/semantic\_merge.py, skills/semantic\_iterator.py, skills/semantic\_extract.py, etc.
+
+**III. Agent Enhancements**
+
+8. **Implement Dynamic Configuration Selection:**  
+   * **Requirement(s):** REQ-FLEX-01 (partially)  
+   * **Task:** Modify config access methods in BaseAgent (e.g., \_get\_system\_message, \_get\_prompt, parameter resolution points) to check the runtime context for override keys (using a defined convention like context\['agent\_config\_overrides'\]\[self.unique\_name\]) before falling back to values derived from the configuration snapshot/persona.  
+   * **Files:** base\_agent.py, base\_llm.py (or continuation handler)
+
+**IV. Observability Refactoring**
+
+9. **Implement Central EventLogger:**  
+   * **Requirement(s):** REQ-OBS-01, REQ-OBS-02, REQ-OBS-03, REQ-OBS-05, REQ-REG-01  
+   * **Task:** Create the EventLogger class (e.g., in c4h\_agents/lineage/event\_logger.py). Implement its \_\_init\_\_ to handle configuration (backends, paths) and the log\_event method to format events according to the standard structure, manage sequence numbers, and persist to file (YYYYMMDD/run\_id/events/HHMMSS\_eventid.json). Include the robust serialization logic (equivalent to BaseLineage.\_serialize\_value) to handle detailed payloads, especially llm\_output. Add optional OpenLineage emission logic.  
+   * **Files:** lineage/event\_logger.py (new)  
+10. **Instrument Orchestrator for Event Logging:**  
+    * **Requirement(s):** REQ-OBS-01  
+    * **Task:** Modify run\_declarative\_workflow to instantiate EventLogger. Add calls to event\_logger.log\_event at all required trigger points (WORKFLOW\_START/END, STEP\_START/END, ROUTING\_EVALUATION, etc.), passing the correct event\_type and constructing the detailed payload (including extracting data from AgentResponse for STEP\_END).  
+    * **Files:** workflows.py  
+11. **Decouple Agent from Lineage:**  
+    * **Requirement(s):** REQ-OBS-01, AR-EVT-02  
+    * **Task:** Remove the self.event\_logger (or self.lineage) attribute and all event/lineage logging calls from BaseAgent.\_\_init\_\_ and BaseAgent.\_process. Ensure AgentResponse correctly returns all necessary data (messages, raw\_output, metrics) for the orchestrator to log.  
+    * **Files:** base\_agent.py  
+12. **Remove BaseLineage:**  
+    * **Requirement(s):** AR-EVT-03  
+    * **Task:** Delete the file c4h\_agents/agents/base\_lineage.py.  
+    * **Files:** base\_lineage.py (delete)
+
+**V. Cleanup**
+
+13. **Identify and List Redundant Files:**  
+    * **Requirement(s):** General code hygiene, Tech Debt Removal.  
+    * **Task:** After completing tasks 1-12, perform static analysis and review to identify any Python files (especially old specific agent classes) or configuration sections that are no longer referenced or used. Generate a list for manual review and deletion.  
+    * **Files:** Analysis of the entire codebase.
+
+This task list provides a structured approach to implementing the remaining requirements based on the C4H philosophy document.

@@ -1,0 +1,212 @@
+# **C4H Enhanced Event Sourcing & Lineage Requirements**
+
+Version: 1.1  
+Date: Sunday, May 4, 2025  
+Status: Defined
+
+## **1\. Introduction**
+
+### **1.1. Purpose**
+
+This document defines the requirements for the refactored event sourcing and lineage tracking system within the C4H Agent framework. The goal is to establish a comprehensive, reliable, and centralized mechanism for capturing workflow execution details, driven by the orchestrator, while **preserving the detailed capture capabilities of the previous implementation**. This enhances observability, debuggability, reproducibility, and auditability, particularly for systems operating in regulated environments.
+
+**Refactoring Context:** These requirements guide the refactoring of the event sourcing capabilities present in the current codebase snapshot (c4h\_ai\_full\_010.txt). The objective is to evolve the existing system towards the target architecture described herein, modifying existing components like the orchestrator and base classes, rather than building a separate, parallel system.
+
+### **1.2. Scope**
+
+This document covers:
+
+* The functional requirements for event capture, including specific data points to retain.  
+* The architectural shift of responsibility for event logging to the orchestrator.  
+* The standardized structure for all logged events.  
+* The required implementation changes to the orchestrator and agent base classes.  
+* The expected persistence format and structure.  
+* Requirements for maintaining OpenLineage compatibility.
+
+### **1.3. Context & Shortcomings of Previous Implementation**
+
+The previous implementation (BaseLineage invoked by BaseAgent within the provided codebase) successfully captured detailed LLM interaction data and supported OpenLineage. However, key shortcomings included:
+
+* **Limited Scope:** Events were mainly captured *within* agents, missing crucial orchestration-level events.  
+* **Decentralized Responsibility:** Logging within agents violated separation of concerns.  
+* **Redundant Storage:** Separate inputs and outputs folders were created.  
+* **Inconsistent Error Capture:** Error logging might not have covered all orchestration failures.
+
+### **1.4. Goals of Refactoring**
+
+* **Centralize Responsibility:** Make the Orchestrator (run\_declarative\_workflow) the sole driver of event logging via a dedicated EventLogger.  
+* **Expand Coverage:** Capture granular events for all significant orchestration actions and state transitions (as defined in FR-EVT-02).  
+* **Standardize Structure:** Implement the consistent, detailed JSON structure defined in Section 3 for *all* events.  
+* **Preserve Detail:** Ensure the rich detail captured for LLM interactions by the previous BaseLineage (inputs, full serialized outputs, metrics) is preserved within the relevant new event types (specifically STEP\_END for agent tasks). **This refactoring must retain this level of detail, simply shifting *where* it is captured and logged.**  
+* **Improve Error Logging:** Reliably capture error information within event payloads for both step-level and orchestration-level failures.  
+* **Simplify Persistence:** Store all relevant data within the event JSONs in a single events directory per run, structured as workspaces/lineage/{YYYYMMDD}/{workflow\_run\_id}/events/ (where {workflow\_run\_id} includes the timestamp prefix, e.g., wf\_HHMM\_UUID), using the filename format {HHMMSS}\_{event\_id}.json. Remove redundant folders.  
+* **Maintain OpenLineage Compatibility:** Ensure the EventLogger can optionally emit events compliant with the OpenLineage standard, preserving existing integration capabilities.  
+* **Eliminate Redundancy:** The refactoring must result in a single, orchestrator-driven event logging system. The previous agent-level implementation (BaseLineage) must be entirely removed.
+
+## **2\. Requirements**
+
+### **2.1. Functional Requirements**
+
+* **FR-EVT-01 (Orchestrator Driven):** All event logging *must* be initiated exclusively by the core orchestrator logic (i.e., run\_declarative\_workflow flow via the EventLogger). Agent base classes (BaseAgent) *must not* contain or invoke event/lineage logging code.  
+* **FR-EVT-02 (Comprehensive Event Types):** The system *must* log distinct events for the following workflow occurrences (at minimum): WORKFLOW\_START, STEP\_START, STEP\_END, ROUTING\_EVALUATION, LOOP\_ITERATION\_START, LOOP\_ITERATION\_END, CONCENTRATOR\_START, CONCENTRATOR\_INPUT\_RECEIVED, CONCENTRATOR\_END, FAN\_OUT\_DISPATCH, WORKFLOW\_END, ERROR\_EVENT.  
+* **FR-EVT-03 (Standard Event Structure):** All logged events *must* adhere to the standard JSON structure defined in Section 3\.  
+* **FR-EVT-04 (Preserve LLM Detail):** For STEP\_END events corresponding to agent tasks involving LLM calls, the event payload *must* contain detailed information equivalent to that previously captured by BaseLineage. This includes:  
+  * llm\_input: Containing structured system and user messages.  
+  * llm\_output: Containing the fully serialized raw LLM response object (e.g., litellm.ModelResponse), processed using a serialization logic equivalent to the previous BaseLineage.\_serialize\_value to capture content, finish reason, model, usage details, etc.  
+  * metrics: Containing LLM token usage (prompt\_tokens, completion\_tokens, total\_tokens) and step execution duration\_ms.  
+  * **Expected Mechanism:** This data is expected to be available to the orchestrator because the refactored run\_agent\_task will return the full AgentResponse object, which contains messages, raw\_output, and metrics. The orchestrator extracts this information from the response and includes it in the STEP\_END event payload logged via the EventLogger.  
+* **FR-EVT-05 (Capture Step Results):** STEP\_END events *must* include the step's success status and relevant data (e.g., the content of AgentResponse.data) or error message in the payload.  
+* **FR-EVT-06 (Capture Routing Detail):** ROUTING\_EVALUATION events *must* include the evaluated conditions, outcome, next\_team\_id(s), and context\_updates in their payload.  
+* **FR-EVT-07 (Capture Errors):** Workflow-level errors (WORKFLOW\_END payload) and step-level errors (STEP\_END payload) *must* include the error message and type. Unhandled orchestration exceptions should trigger an ERROR\_EVENT with error details and traceback if possible.  
+* **FR-EVT-08 (Configuration Reference):** All events *must* include the configuration block referencing the effective configuration snapshot path and hash.  
+* **FR-EVT-09 (Context Snippets):** Event payloads *should* include relevant snippets or keys from the data\_context and execution\_metadata applicable at the time of the event, subject to truncation rules.  
+* **FR-EVT-10 (Persistence):** Events *must* be persisted as individual JSON files within a run-specific directory structured as: workspaces/lineage/{YYYYMMDD}/{workflow\_run\_id}/events/ (where {workflow\_run\_id} includes the timestamp prefix, e.g., wf\_HHMM\_UUID). Filenames *must* follow the format: {HHMMSS}\_{event\_id}.json. The redundant inputs/, outputs/, and errors/ subdirectories *must not* be created.  
+* **FR-EVT-11 (OpenLineage Compatibility):** The EventLogger *must* provide a configurable option to *also* emit events in the OpenLineage format (specifically RunEvent with appropriate facets mirroring the JSON structure) to a specified backend URL (e.g., for Marquez integration), preserving the functionality of the previous BaseLineage.\_emit\_marquez\_event.
+
+### **2.2. Architectural Requirements**
+
+* **AR-EVT-01 (Central EventLogger):** A dedicated EventLogger class/service *must* be implemented and used by the orchestrator for all event logging. It must handle both file persistence (using the correct directory structure) and optional OpenLineage emission based on configuration.  
+* **AR-EVT-02 (BaseAgent Decoupling):** BaseAgent *must* be completely decoupled from event/lineage logging. The self.lineage attribute and related methods/calls *must* be removed.  
+* **AR-EVT-03 (BaseLineage Removal):** The c4h\_agents/agents/base\_lineage.py file and the BaseLineage class *must* be deleted as part of this refactoring. The new EventLogger replaces its functionality entirely.
+
+## **3\. Standard Event Structure**
+
+All events logged by the EventLogger must conform to the following JSON structure. The payload field will vary based on the event\_type.
+
+{  
+  "event\_id": "string (UUID)", // Unique identifier for this specific event log entry  
+  "event\_type": "string", // Type of event (e.g., WORKFLOW\_START, STEP\_END, ROUTING\_EVALUATION)  
+  "timestamp": "string (ISO 8601 UTC)", // Timestamp when the event occurred  
+  "sequence": "integer", // Monotonically increasing sequence number within the workflow run
+
+  "workflow": {  
+    "run\_id": "string", // Identifier for the entire workflow run (e.g., wf\_HHMM\_UUID or similar)  
+    "parent\_id": "string | null", // ID of the parent execution (e.g., calling agent/step ID) \- Often null for top-level orchestrator events  
+    "step\_name": "string | null", // Unique name/ID of the current step/task/team being processed (if applicable)  
+    "execution\_path": \["string"\] // List representing the call stack or path to this event  
+  },
+
+  "agent": { // Information about the component emitting the event (usually the orchestrator)  
+    "name": "string", // e.g., "Orchestrator", "run\_declarative\_workflow"  
+    "type": "string" // e.g., "OrchestratorFlow"  
+  },
+
+  "configuration": {  
+    // Reference to the immutable config snapshot used for this run  
+    "snapshot\_path": "string | null", // Full path to the effective\_config\_HASH.yml file  
+    "config\_hash": "string | null", // Hash identifier of the configuration snapshot  
+    "timestamp": "string (ISO 8601 UTC)" // Timestamp when the snapshot was generated/loaded  
+  },
+
+  "payload": {  
+    // Event-specific data structure. Examples below.  
+    // Varies based on event\_type. MUST be JSON serializable.  
+  }  
+}
+
+### **3.1. Example Payload Structures (Illustrative \- ensure alignment with FRs)**
+
+* **WORKFLOW\_START Payload:**  
+  {  
+    "initial\_context\_keys": \["list", "of", "keys"\],  
+    "entry\_team\_id": "string",  
+    "system\_config\_path": "string"  
+  }
+
+* **STEP\_START Payload:**  
+  {  
+    "step\_type": "string (e.g., TaskAgent, loop, concentrator)",  
+    "context\_keys": \["list", "of", "keys"\],  
+    "metadata\_keys": \["list", "of", "keys"\]  
+  }
+
+* **STEP\_END (Agent Task Example) Payload:** **(Incorporating FR-EVT-04)**  
+  {  
+    "step\_type": "TaskAgent", // Or specific agent type if known  
+    "agent\_response\_summary": { // Summary of AgentResponse  
+      "success": "boolean",  
+      "data\_keys\_or\_summary": { "...": "..." }, // Keys or summary of AgentResponse.data (potentially truncated)  
+      "error": "string | null"  
+    },  
+    "metrics": { // Preserved detailed metrics  
+        "completion\_tokens": "integer | null",  
+        "prompt\_tokens": "integer | null",  
+        "total\_tokens": "integer | null",  
+        "duration\_ms": "float"  
+        // Potentially other agent-specific metrics  
+     },  
+    "llm\_input": { // Preserved LLM input detail  
+      "system": "string (potentially truncated)",  
+      "user": "string (potentially truncated)"  
+    },  
+    "llm\_output": { // Preserved serialized LLM output detail  
+      "content": "string (potentially truncated)",  
+      "finish\_reason": "string | null",  
+      "model": "string | null",  
+      // Other relevant fields from serialized response object  
+      "raw\_serialized\_object": { "...": "..." } // The full serialized object if feasible/configured  
+    }  
+  }
+
+* **ROUTING\_EVALUATION Payload:**  
+  {  
+    "evaluated\_team\_id": "string",  
+    "team\_success\_status": "boolean",  
+    "matched\_condition": "string | dict | list | null",  
+    "outcome": {  
+      "next\_team\_id": "string | list | null",  
+      "context\_updates\_keys": \["list", "of", "keys"\]  
+    }  
+  }
+
+* **WORKFLOW\_END Payload:**  
+  {  
+    "final\_status": "string (e.g., success, error)",  
+    "final\_error": "string | null",  
+    "total\_steps\_executed": "integer",  
+    "final\_context\_keys": \["list", "of", "keys"\]  
+  }
+
+* **ERROR\_EVENT Payload:**  
+  {  
+      "error\_message": "string",  
+      "error\_type": "string",  
+      "traceback": "string | null",  
+      "location": "string (e.g., OrchestratorLoopHandling)"  
+  }
+
+## **4\. Implementation Guidance**
+
+* **EventLogger Implementation:**  
+  * Must be instantiated once per workflow run by run\_declarative\_workflow.  
+  * Must accept configuration for file path structure (base path), OpenLineage URL/settings, and enablement flags for each backend.  
+  * Must maintain an internal sequence counter.  
+  * The log\_event method must generate event\_id, timestamp, use the sequence counter, format the standard structure, incorporate the provided payload (including detailed LLM data for relevant events), and handle persistence/emission:  
+    * **File Persistence:** Construct the path as base\_path / {YYYYMMDD} / {run\_id} / events / {HHMMSS}\_{event\_id}.json. Ensure the {run\_id} received already contains the wf\_HHMM\_ prefix. Write the JSON event data.  
+    * **OpenLineage Emission (Optional):** If configured, format and emit an OpenLineage RunEvent to the specified backend URL, mapping the standard JSON structure to appropriate OpenLineage facets (preserving the logic from the previous \_emit\_marquez\_event).  
+  * Must include robust serialization logic (equivalent to previous BaseLineage.\_serialize\_value) to handle complex objects like LLM responses within the event payload.  
+  * Must handle errors gracefully for both file writing and OpenLineage emission.  
+* **Orchestrator (run\_declarative\_workflow) Modifications:**  
+  * Instantiate EventLogger using runtime.lineage config from the effective snapshot.  
+  * Insert event\_logger.log\_event(...) calls at all trigger points (FR-EVT-02), passing appropriate event\_type and constructing detailed payload dictionaries, including AgentResponse data for STEP\_END. **This is where the detailed LLM I/O data, received via the AgentResponse from run\_agent\_task, will be captured.**  
+* **BaseAgent Modifications:**  
+  * Remove self.lineage attribute and all related calls. **Ensure AgentResponse returned by process contains all necessary data (messages, raw\_output, metrics) for the orchestrator to log.**  
+* **BaseLineage Deletion:**  
+  * Delete the file c4h\_agents/agents/base\_lineage.py.
+
+## **5\. Persistence Structure**
+
+The required output structure under workspaces/lineage/ is:
+
+workspaces/lineage/  
+└── {YYYYMMDD}/                     \# Date-based folder (e.g., 20250504\)  
+    └── {workflow\_run\_id}/          \# Run-specific folder (e.g., wf\_1158\_7910aea6...)  
+        └── events/                 \# ONLY events folder  
+            ├── {HHMMSS}\_{event\_id}.json  \# e.g., 115821\_ae287d4e....json  
+            ├── {HHMMSS}\_{event\_id}.json  
+            ├── ...  
+            └── {HHMMSS}\_{event\_id}.json
+
+*(Filename format: {HHMMSS}\_{event\_id}.json where HHMMSS comes from the event timestamp, and event\_id is the unique event UUID)*
+
+The inputs/, outputs/, and errors/ subdirectories **must not** be created. All relevant data is captured within the event payloads.

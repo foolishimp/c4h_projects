@@ -1,0 +1,73 @@
+# **C4H System: Philosophical Goals & Architectural Requirements**
+
+Version: 1.0  
+Date: Tuesday, May 6, 2025  
+Status: Defined
+
+## **1\. Introduction**
+
+### **1.1 Purpose**
+
+This document outlines the core philosophical goals and defining architectural requirements for the C4H Agent System. It aims to capture the underlying methodology that differentiates C4H from generic AI/agent toolkits. These goals and requirements serve as the high-level principles against which the success of the current refactoring effort and future system evolution should be measured. They provide the "why" behind specific design choices and form the basis for deriving concrete success criteria.
+
+### **1.2 Differentiation**
+
+C4H is positioned not just as a framework or toolkit, but as an opinionated **methodology** for building complex, intent-driven, AI-powered systems, particularly in domains requiring high assurance, such as software development. It prioritizes process-level predictability, observability, and reproducibility by combining declarative definitions with structured execution patterns inspired by organizational models.
+
+## **2\. Core Goals & Requirements**
+
+### **Goal 1: Establish a Declarative Methodology for Workflow Definition**
+
+*Rationale: To separate the definition of what the system should do and how its components interact from the underlying execution code, promoting clarity, maintainability, and configuration-driven behavior.*
+
+* **REQ-METHOD-01:** Workflow logic, including the sequence of operational stages (Teams), the tasks within those stages, the assignment of agent roles (via type and persona), and the control flow (routing, loops, parallelism), *must* be primarily definable through declarative configuration artifacts (e.g., YAML).  
+* **REQ-METHOD-02:** The declarative definition *must* be the primary source of truth for the orchestrator engine during runtime execution.  
+* **REQ-METHOD-03:** The methodology must clearly distinguish between the declarative process definition and the codebase that implements the execution engine and capabilities (agents, skills).
+
+### **Goal 2: Model Complex Processes via Organizational Abstraction**
+
+*Rationale: To provide an intuitive and scalable way to decompose complex problems and manage agent interactions, mirroring effective functional decomposition in organizations.*
+
+* **REQ-ORG-01:** Workflows *must* be structured around logical stages or **Teams**, representing distinct areas of responsibility or phases of work.  
+* **REQ-ORG-02:** Tasks within Teams *must* be executed by **Agents**, whose specific role and behavior are determined at runtime based on a combination of a generic agent\_type and a specific configuration persona (referenced via persona\_key). Direct instantiation via specific agent classes must be disallowed.  
+* **REQ-ORG-03:** Reusable, specific functionalities or capabilities (especially those involving side effects or complex, deterministic logic) *must* be encapsulated as **Skills** with a defined contract, callable by Agents based on their configuration.
+
+### **Goal 3: Achieve Process-Level Determinism & Reproducibility**
+
+*Rationale: To build reliable and auditable systems despite using non-deterministic components (LLMs) by ensuring the overall process execution is predictable and repeatable given the same inputs and configuration.*
+
+* **REQ-DET-01 (Immutable Configuration):** Agent and orchestrator execution for a specific run *must* be based solely on an **Immutable Effective Configuration Snapshot** generated at the start of the run. This snapshot encapsulates all system, persona, and job-specific configurations.  
+* **REQ-DET-02 (Stateless Agents):** Core agent implementations (TaskAgent, etc.) *must* be **stateless** regarding workflow progression between invocations. All necessary state must be passed via the input context.  
+* **REQ-DET-03 (Declarative Control Flow):** The sequence and conditions for transitions between workflow steps *must* be determined by the **declarative configuration** interpreted by the orchestrator, not by emergent behavior or direct communication between agents.  
+* **REQ-DET-04 (Totality):** Agents and Skills *must* implement **total functions** where feasible, returning structured success/failure responses (AgentResponse, SkillResult) rather than raising exceptions for expected operational errors, enabling predictable error handling by the orchestrator.  
+* **REQ-DET-05 (Immutable Context):** Workflow context updates managed by the orchestrator *must* be handled **immutably**, creating new context states for subsequent steps rather than modifying shared state in place.
+
+### **Goal 4: Ensure High Observability for Assurance & Debugging**
+
+*Rationale: To provide the necessary visibility and traceability required for debugging complex executions, ensuring compliance, and building trust, especially in regulated environments.*
+
+* **REQ-OBS-01 (Orchestrator-Driven Events):** Comprehensive event sourcing *must* be implemented, with event logging driven **exclusively by the Orchestrator** at key state transitions and execution points (e.g., WORKFLOW\_START/END, STEP\_START/END, ROUTING\_EVALUATION, LOOP\_ITERATION, etc.). Agents must not perform primary event/lineage logging.  
+* **REQ-OBS-02 (Standardized Event Structure):** All logged events *must* adhere to a defined, **standardized JSON structure**, capturing essential metadata (IDs, timestamps, sequence, config reference) and event-specific payloads.  
+* **REQ-OBS-03 (Preserve Interaction Detail):** Events related to agent task completion (STEP\_END) *must* capture the **full context of LLM interactions** (inputs, serialized raw outputs, metrics) when applicable, ensuring no loss of detail compared to previous agent-level logging. This data must be propagated back to the orchestrator via the AgentResponse.  
+* **REQ-OBS-04 (Structured Logging):** The system *must* utilize **structured logging** (e.g., JSON format via structlog) for operational logs, allowing for easier parsing and analysis.  
+* **REQ-OBS-05 (Simplified Persistence):** Event data *must* be persisted in a structured, run-specific directory format ({YYYYMMDD}/{run\_id}/events/) using timestamped filenames ({HHMMSS}\_{event\_id}.json), consolidating all necessary information within the event files and eliminating redundant input/output folders.
+
+### **Goal 5: Maintain Implementation Flexibility for Orchestration Definition**
+
+*Rationale: To allow the definition of orchestration logic (especially complex internal agent sub-processes) using the most appropriate method (declarative or programmatic) while ensuring a consistent execution model.*
+
+* **REQ-FLEX-01 (Multiple Definition Inputs):** The system architecture *must* support defining orchestration logic (both main workflow and internal agent plans) through multiple mechanisms, including:  
+  * Declarative YAML configuration (as the primary method for main workflows and simpler agent plans).  
+  * Programmatic construction via a potential future **Orchestration Builder Factory** API (allowing complex plans to be defined in Python code).  
+  * Simple data structures (e.g., lists of nodes/edges) interpreted by a builder factory.  
+* **REQ-FLEX-02 (Consistent Execution Model):** Regardless of how an orchestration plan (main or agent-internal) is *defined*, the runtime execution engine (Prefect for the main flow, GenericOrchestratorAgent for internal plans) *must* operate on a standardized internal representation (e.g., a graph object or sequence), ensuring consistent execution behavior.
+
+### **Goal 6: Suitability for Regulated Environments**
+
+*Rationale: The culmination of the preceding goals aims to produce a system architecture inherently suitable for deployment in regulated industries.*
+
+* **REQ-REG-01:** The combined implementation of declarative workflows, immutable snapshots, statelessness, totality, comprehensive observability (logging and event sourcing), and clear organizational abstractions *must* result in a system that demonstrably meets common requirements for **auditability, reproducibility, traceability, and process validation** found in regulated environments.
+
+## **3\. Conclusion**
+
+These goals and requirements define the core philosophy and target architecture of the C4H system. It emphasizes a structured, declarative, and observable approach to building complex AI systems, aiming for process-level determinism and reproducibility. By adhering to these principles, the system intends to provide a robust and auditable foundation suitable for demanding applications, including those in regulated industries, while retaining flexibility through its modular design and methodology that transcends specific implementation tooling. Success criteria for refactoring and development should be derived directly from these foundational requirements.
