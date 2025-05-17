@@ -4,6 +4,8 @@
 
 This document provides guidance on how to create effective prompts (work orders) for the C4H Agent System. It covers the structure, key components, and best practices for designing prompts that align with the system's design principles.
 
+Workorders are scoped to be able to be single shot executed by an LLM such as claude 3.7, or Gemeni 2.5 Pro. This means the scope of a work order needs to be balanced to fit within the  context and complexity of an LLM.
+
 ## **Config Structure Overview**
 
 The C4H Agent System uses a hierarchical configuration model with three main sections:
@@ -40,23 +42,6 @@ llm_config:
         enabled: true  
         budget_tokens: 32000
 
-    coder:  
-      provider: "anthropic"  
-      model: "claude-3-7-sonnet-20250219"  
-      temperature: 0  
-      backup_enabled: true
-
-runtime:  
-  workflow:  
-    storage:  
-      enabled: true  
-      root_dir: "workspaces/workflows"  
-      format: "yymmdd_hhmm_{workflow_id}"
-
-logging:  
-  level: "INFO"  
-  format: "structured"  
-  agent_level: "DEBUG"
 
 ### **Key System Configuration Components**
 

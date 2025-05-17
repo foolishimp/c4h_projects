@@ -553,3 +553,15 @@ tartxt.py \
  -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**,**/*.toml" \
   -f /Users/jim/src/apps/c4h_projects/backup_txt/c4h_master_doc.txt
 
+
+
+# Absolute paths for external documents
+          - /Users/jim/src/apps/c4h_projects/docs/refactoring_docs/refactor_0505 # Include the directory
+          - /Users/jim/src/apps/c4h_projects/docs/design_docs/Agent_Design_Principles_v2.md
+          - /Users/jim/src/apps/c4h_projects/docs/requirements_docs/c4h_orchestration_enhancements_0430.md # Assuming this exists
+          - /Users/jim/src/apps/c4h_projects/docs/design_docs/Config_Design_Principles.md
+          - /Users/jim/src/apps/c4h_projects/docs/requirements_docs/c4h_orchestration_refactor_0504.md # Assuming this exists
+          - /Users/jim/src/apps/c4h_projects/docs/refactoring_docs/refactor_0505/c4h_event_sourcing_reqs_v1.1.md # Assuming this exists
+          # Add paths to the NEW architecture documents created previously
+          - /Users/jim/src/apps/c4h_projects/docs/architecture/C4H_Unified_Architecture_V3.md 
+          - /Users/jim/src/apps/c4h_projects/docs/refactoring_docs/refactor_phase1/Requirements_Implementation_Plan_v1.md 
