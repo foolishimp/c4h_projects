@@ -4,7 +4,7 @@ Date: May 7, 2025
 Status: Adopted  
 Purpose: This document outlines the definitive architecture for the C4H (Coder for Hire) system. It consolidates and refines previous architectural concepts, design principles, and operational models into a single, authoritative reference. This document supersedes all prior C4H architecture documents.
 
-## **1\. Introduction and Vision**
+## **1. Introduction and Vision**
 
 ### **1.1. Purpose of C4H**
 
