@@ -1,4 +1,4 @@
-# The Case for PySpark: Why Architectural Consistency Trumps Tool Specialization
+# The Case for PySpark: Why Architectural Consistency Over Tool Specialization
 
 ## Executive Summary
 
