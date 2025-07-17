@@ -2,19 +2,22 @@
 
 ## Executive Summary
 
-This assessment evaluates whether to maintain our current PySpark-based regulatory calculation platform or migrate to a DBT-based architecture. The comparison reveals fundamental differences in technological capabilities: Python/PySpark provides a complete programming ecosystem essential for complex regulatory calculations, while DBT offers SQL-based transformations suited for ETL workflows but lacking the mathematical capabilities regulatory calculations require.
+This assessment evaluates whether to maintain our current PySpark-based regulatory calculation platform or introduce DBT for certain data processing tasks. While DBT is a capable SQL transformation tool that can meet basic regulatory requirements like attribute-level lineage, introducing it would fragment our architecture and sacrifice the significant investments we've made in our current platform.
+
+Our PySpark implementation with wrapped operators provides row-level lineage—tracking exactly which rows contributed to each result. This capability, impossible to achieve with SQL-based tools, provides competitive advantage in regulatory compliance and positions us for AI/LLM integration.
 
 After comprehensive analysis across seven critical dimensions, the results are decisive:
 
 - **Current PySpark Solution**: 85.5% weighted score
 - **DBT Alternative**: 43.0% weighted score
 
-**Recommendation**: Enhance the existing PySpark platform rather than migrate. The current solution provides superior regulatory compliance, business agility, and future readiness. Migration would introduce significant risks while eliminating competitive advantages.
+**Recommendation**: Continue enhancing the existing PySpark platform. Maintain architectural consistency to leverage existing investments in technology, expertise, and operational procedures while preserving our competitive advantages.
 
 **Key Differentiators**:
-- Attribute-level lineage meets CCAR requirements
-- Row-level tracing provides competitive advantage and LLM assurance
-- Direct SME control over calculations
+- Both meet attribute-level lineage (CCAR requirement)
+- Row-level tracing provides competitive advantage beyond requirements
+- Direct SME control over calculations through unified platform
+- Architectural consistency leveraging existing investments
 - Mixed-squad operational model drives organizational innovation
 
 ## Assessment Methodology
@@ -27,7 +30,7 @@ We evaluated both solutions across seven weighted criteria, with weights determi
 
 | Criteria | Weight | PySpark | DBT | Key Differentiator |
 |----------|--------|---------|-----|-------------------|
-| **Regulatory Compliance** | 25% | 9/10 | 4/10 | Attribute-level lineage (CCAR requirement) + row-level tracing (competitive advantage). DBT provides model-level lineage only; row-level tracing would require extensive custom development. |
+| **Regulatory Compliance** | 25% | 9/10 | 4/10 | Both provide attribute-level lineage for CCAR. PySpark adds row-level tracing showing exact source contributions—a significant competitive advantage. |
 | **Business User Empowerment** | 25% | 9/10 | 2/10 | Current platform enables mixed squads with row-level assurance for SME confidence. DBT enforces traditional separation without granular validation capabilities. |
 | **Future-Ready Architecture** | 20% | 9/10 | 3/10 | Python's complete ecosystem enables LLM integration. DBT's SQL/Jinja templates complicate AI code generation. Row-level tracing essential for validating AI outputs. |
 | **Scalability** | 15% | 9/10 | 6/10 | Spark designed for distributed computing of complex calculations. DBT relies on warehouse compute, suitable for SQL but not algorithmic workloads. |
@@ -37,7 +40,7 @@ We evaluated both solutions across seven weighted criteria, with weights determi
 | Criteria | Weight | PySpark | DBT | Key Differentiator |
 |----------|--------|---------|-----|-------------------|
 | **Development Velocity** | 5% | 8/10 | 6/10 | Complex regulatory logic requires full programming capabilities. DBT's SQL/Jinja approach cannot handle sophisticated mathematical models. |
-| **Total Cost of Ownership** | 3% | 7/10 | 6/10 | Python developers are readily available in financial services. DBT would require retraining teams and hiring new skills for a tool unsuited to the core use case. |
+| **Total Cost of Ownership** | 3% | 7/10 | 6/10 | Maintaining one technology stack vs managing two. DBT would require additional training, tooling, and operational overhead. |
 | **Team Expertise** | 2% | 8/10 | 5/10 | Python dominance in regulatory calculations vs DBT's SQL focus |
 
 ### Weighted Results
@@ -50,70 +53,88 @@ We evaluated both solutions across seven weighted criteria, with weights determi
 ### Current Solution (PySpark)
 
 **Strengths**:
-- Industry-standard technology for regulatory calculations (used by JPMorgan, Goldman Sachs, etc.)
-- Proven platform with established team expertise
-- Comprehensive audit trail for regulatory compliance
+- Unified technology stack with consistent practices across all data processing
+- Industry-standard technology for regulatory calculations (used by major banks)
+- Proven platform with established team expertise and operational procedures
+- Comprehensive audit trail through row-level lineage exceeding regulatory requirements
 - Enables rapid regulatory response (hours vs weeks)
 - Supports mixed-squad organizational model
 - Leverages Python's vast ecosystem of financial and mathematical libraries
+- Significant existing investment in platform, training, and processes
 
 **Risks & Mitigations**:
-- **Custom maintenance burden** → Mitigated by Python's vast ecosystem and widespread expertise in financial services
-- **Specialized knowledge** → Python skills are common in regulatory calculation teams; extensive documentation exists
-- **Enterprise standards** → Resolved via API integration layer
+- **Custom solution maintenance** → Mitigated by established team expertise and extensive Python ecosystem
+- **Knowledge concentration** → Addressed through documentation and Python's widespread use in finance
+- **Enterprise standards** → Resolved via API integration layer while maintaining consistency
 
 ### DBT Alternative
 
 **Critical Risks**:
-- **Regulatory compliance gap**: Cannot provide attribute-level lineage required by CCAR
-- **Future regulatory exposure**: No row-level tracing to anticipate evolving requirements
+- **Row-level tracing gap**: Cannot provide row-level lineage showing exact source row contributions
+- **Future regulatory exposure**: No granular tracing to anticipate evolving requirements
 - **Business agility loss**: Returns to multi-week development cycles
 - **Organizational regression**: Eliminates mixed-squad benefits
 - **Trust deficit**: No row-level assurance for SME-built or LLM-generated calculations
-- **Migration complexity**: 18-24 month timeline with uncertain outcomes
+- **Architectural fragmentation**: Introduces inconsistency after significant platform investment
 
-**Limited Benefits**:
-- Provides SQL-based transformation patterns familiar to data engineers
-- Offers built-in testing and documentation for data pipelines
-- Vendor-supported solution with active community
-- Well-suited for standardized ETL/ELT workflows
-- However, lacks capabilities for complex regulatory calculations
+**DBT's Strengths in Isolation**:
+- Strong SQL-based transformation patterns for data warehousing
+- Built-in testing and documentation for data pipelines
+- Active community and vendor support
+- Good for ETL/ELT workflows where SQL is sufficient
+- Can provide attribute-level lineage through various tools
+- Well-established in data engineering community
+
+**However**: Introducing it alongside our existing PySpark platform would:
+- Fragment our unified architecture
+- Create operational complexity
+- Sacrifice the benefits of consistency
+- Provide no additional capabilities we currently lack
 
 ## Strategic Analysis
 
-### Technology Suitability: Purpose-Built vs Template-Based
+### Technology Suitability and Architectural Consistency
 
-The comparison between Python/PySpark and DBT is not about technological advancement—both are modern tools serving different purposes. The critical distinction lies in their fundamental design philosophies and resulting capabilities for regulatory calculations.
+The comparison between Python/PySpark and DBT reveals tools designed for different purposes, each with their strengths:
 
 **Python/PySpark: Complete Programming Ecosystem**
-- Python has established itself as the dominant language for financial services, with JPMorgan's Athena platform and Goldman Sachs' GS Quant built on Python
-- Major financial institutions use Python for quantitative research, risk management, and regulatory compliance
-- Provides full programming language capabilities essential for complex mathematical models
-- Extensive ecosystem including NumPy, Pandas, and specialized packages for quantitative finance
+- Established as the dominant language for financial services (JPMorgan's Athena, Goldman Sachs' GS Quant)
+- Provides full programming capabilities essential for complex mathematical models
+- Extensive ecosystem including NumPy, Pandas, and specialized quantitative finance packages
 - Enables implementation of sophisticated algorithms required by Basel III and CCAR
-- Natural fit for teams already using Python for risk modeling and analytics
+- Our wrapped operators add row-level lineage capabilities beyond standard PySpark
 
 **DBT: SQL Transformation Framework**
-- Designed for ETL/ELT workflows, not computational workloads
-- Primarily used in financial services for basic reporting and data warehouse management
+- Excellent for data warehouse transformations and ETL/ELT workflows
+- Provides attribute-level lineage capabilities through various tools
+- Strong community and vendor support
 - Template-based approach using SQL and Jinja
-- Excellent for standardized transformations but fundamentally unable to implement Basel III mathematical models
-- Cannot perform the complex calculations required for risk-weighted assets, CVA, or other regulatory metrics
-- No evidence of adoption for regulatory calculations in any major financial institution
+- Well-suited for standard reporting and data transformations
 
-The talent pool reality strongly favors Python: financial institutions employ thousands of Python developers for quantitative work, while DBT expertise centers around data engineering and analytics engineering roles. Python is widely used in quantitative finance for complex calculations and risk management. For regulatory calculation teams specifically, Python skills are the industry standard—every major bank's quantitative teams use Python as their primary language.
+However, introducing DBT alongside our existing PySpark platform would:
+- Fragment the architecture into two separate technology stacks
+- Require maintaining different deployment, monitoring, and debugging approaches
+- Split team expertise and knowledge
+- Create gaps in our row-level lineage coverage
+- Add operational complexity without providing capabilities we lack
+
+Given our significant investment in the PySpark platform with wrapped operators, maintaining architectural consistency provides greater value than introducing technology diversity.
 
 ### Row-Level Tracing: Beyond Compliance to Competitive Advantage
 
-While CCAR mandates attribute-level lineage, our platform's row-level tracing capability represents a strategic differentiator that:
+While both platforms can meet CCAR's attribute-level lineage requirements, our platform's row-level tracing capability represents a strategic differentiator that:
 
-1. **Anticipates Future Regulations**: Regulatory requirements consistently evolve toward greater granularity and transparency. Row-level tracing positions us ahead of this curve.
+1. **Exceeds Regulatory Requirements**: While attribute-level lineage satisfies CCAR, row-level tracing provides granular visibility that:
+   - Shows exactly which rows contributed to each calculated value
+   - Enables precise debugging of calculation issues
+   - Provides complete audit trails for regulatory inquiries
+   - Positions us ahead of evolving regulatory requirements
 
 2. **Enables SME Autonomy**: When business users directly build calculations, they need granular visibility to:
-   - Validate their logic works correctly
-   - Understand calculation behavior on specific cases
+   - Validate their logic works correctly on specific data points
+   - Understand calculation behavior on edge cases
    - Make targeted adjustments with confidence
-   - Debug edge cases independently
+   - Debug issues independently without technical support
 
 3. **Provides LLM Assurance**: As AI generates increasingly complex calculations:
    - Row-level tracing becomes **mandatory** for trust and validation
@@ -121,11 +142,13 @@ While CCAR mandates attribute-level lineage, our platform's row-level tracing ca
    - Immediate feedback loops improve LLM outputs
    - Granular audit trails satisfy both regulatory and risk management needs
 
-4. **Supports Real-Time Adjustments**: Organizations can:
+4. **Supports Real-Time Analysis**: Organizations can:
    - Trace the impact of changes at individual record level
    - Quickly identify and correct calculation errors
    - Provide detailed explanations to regulators
    - Maintain confidence in rapidly evolving calculations
+
+This capability, built into our wrapped operators, cannot be replicated in any SQL-based tool and represents a significant competitive advantage.
 
 ### Operating Model Impact
 
@@ -178,6 +201,7 @@ The emergence of AI-assisted development fundamentally changes the evaluation:
 - SMEs verify calculations work correctly on specific data points
 - Immediate feedback loops improve LLM accuracy for regulatory domain
 - Technical team focuses on platform capabilities, not calculation debugging
+- Maintains consistency with existing architecture
 
 **DBT + LLM Challenges**:
 - Jinja templating complicates AI code generation
@@ -268,9 +292,16 @@ The emergence of AI-assisted development fundamentally changes the evaluation:
 
 ## Conclusion
 
-The assessment clearly demonstrates that the current PySpark platform provides superior value across all critical dimensions. The fundamental mismatch between DBT's SQL transformation capabilities and the mathematical requirements of regulatory calculations makes migration technically inappropriate, not merely inadvisable.
+The assessment clearly demonstrates that the current PySpark platform provides superior value across all critical dimensions. While DBT can meet basic regulatory requirements like attribute-level lineage, it cannot provide the row-level tracing that represents our competitive advantage.
 
-Python has established itself as the industry standard for financial calculations, with every major financial institution using it for risk management and regulatory compliance. Our platform leverages this ecosystem while adding competitive advantages through row-level tracing and mixed-squad enablement.
+The fundamental mismatch between DBT's SQL transformation capabilities and the mathematical requirements of regulatory calculations makes it unsuitable for our core use cases. More importantly, having invested significantly in:
+
+- **Wrapped operators with row-level lineage**: A sophisticated architecture that tracks exact row contributions
+- **Team expertise**: Specialized knowledge in Python/PySpark and our custom framework
+- **Operational procedures**: Established monitoring, deployment, and debugging practices
+- **Mixed-squad model**: Organizational innovation that empowers SMEs
+
+Introducing DBT would fragment this investment and create architectural inconsistency without providing compensating benefits. 
 
 Beyond meeting CCAR's attribute-level lineage requirements, the platform's row-level tracing capability represents a strategic investment in:
 
@@ -279,30 +310,26 @@ Beyond meeting CCAR's attribute-level lineage requirements, the platform's row-l
 - **AI Readiness**: Enabling mandatory validation for LLM-generated calculations
 - **Competitive Differentiation**: Offering capabilities that exceed industry standards
 
-The mixed-squad operational model this platform enables represents genuine organizational innovation. In an era where AI will increasingly generate complex calculations, row-level tracing transforms from a "nice-to-have" to an essential trust mechanism.
+The recommended enhancement path preserves these strategic advantages while addressing modernization needs through targeted improvements. By maintaining architectural consistency with our existing PySpark platform, we:
+- Leverage existing investments
+- Avoid operational complexity
+- Maintain competitive advantages
+- Position for future innovation
 
-While DBT excels at SQL-based data transformations, adopting it for regulatory calculations would:
-- Fail to support the complex mathematical models these calculations require
-- Meet only minimum regulatory requirements without future-proofing
-- Eliminate the row-level assurance critical for LLM adoption
-- Reduce organizational agility and innovation
-- Remove established competitive advantages
-- Require significant investment to achieve inferior capabilities
-
-The recommended enhancement path preserves these strategic advantages while addressing modernization needs through targeted improvements. This approach positions the organization for continued leadership in regulatory technology innovation, particularly as AI transforms how calculations are created and validated.
+This approach ensures continued leadership in regulatory technology innovation while building on proven capabilities rather than fragmenting the architecture.
 
 ## Appendix: Criteria Definitions
 
 **Regulatory Compliance**: Ability to provide complete audit trails, data lineage, and meet all regulatory reporting requirements.
 
-**Business User Empowerment**: Capability for domain experts to directly create and modify calculations without technical intermediation. Includes providing abstraction layers and UI tools that allow SMEs to work with Python-based calculations through business-friendly interfaces.
+**Business User Empowerment**: Capability for domain experts to directly create and modify calculations without technical intermediation. Includes providing abstraction layers and UI tools that allow SMEs to work with Python-based calculations through business-friendly interfaces, with full row-level traceability for confidence.
 
-**Future-Ready Architecture**: Platform compatibility with emerging technologies, particularly AI/ML and natural language interfaces. Ability to leverage the complete ecosystem of a programming language versus template-based approaches.
+**Future-Ready Architecture**: Platform compatibility with emerging technologies, particularly AI/ML and natural language interfaces. Ability to leverage the complete ecosystem of a programming language versus template-based approaches. Includes maintaining architectural consistency to build on existing capabilities.
 
-**Scalability**: Ability to handle exponential growth in calculations, data volumes, and computational requirements. Includes distributed processing of complex mathematical models, not just data transformation.
+**Scalability**: Ability to handle exponential growth in calculations, data volumes, and computational requirements. Includes distributed processing of complex mathematical models and maintaining consistent scaling patterns across all data processing needs.
 
-**Development Velocity**: Speed of implementing new requirements from identification to production deployment. Includes ability to implement complex mathematical models and algorithms required for regulatory calculations.
+**Development Velocity**: Speed of implementing new requirements from identification to production deployment. Includes ability to implement complex mathematical models and algorithms required for regulatory calculations, as well as maintaining consistency with existing codebase and practices.
 
-**Total Cost of Ownership**: Comprehensive costs including development, operations, training, and opportunity costs.
+**Total Cost of Ownership**: Comprehensive costs including development, operations, training, maintenance, and the cost of architectural complexity. Reflects the efficiency of maintaining one technology stack versus the overhead of managing multiple systems.
 
-**Team Expertise**: Alignment with current team skills, availability of talent in the market, and prevalence of the technology in regulatory calculation contexts. Python dominates financial services and regulatory calculations, while DBT is primarily used for data transformation workflows.
+**Team Expertise**: Alignment with current team skills, leveraging existing platform knowledge, and maintaining consistency with established practices. Reflects the value of existing investments in training, documentation, and operational procedures.

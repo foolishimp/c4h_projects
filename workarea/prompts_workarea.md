@@ -565,3 +565,9 @@ tartxt.py \
           # Add paths to the NEW architecture documents created previously
           - /Users/jim/src/apps/c4h_projects/docs/architecture/C4H_Unified_Architecture_V3.md 
           - /Users/jim/src/apps/c4h_projects/docs/refactoring_docs/refactor_phase1/Requirements_Implementation_Plan_v1.md 
+
+
+tartxt.py \
+  . \
+ -x "**/__pycache__/**,**/.git/**,**/*.pyc,**/node_modules/**,**/package-lock.json,**/dist/**,**/.DS_Store,**/README.md,**/workspaces/**,**/*.toml" \
+  -f PB_code.txt
