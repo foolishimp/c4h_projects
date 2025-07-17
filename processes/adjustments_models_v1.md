@@ -17,130 +17,509 @@ This document outlines the architecture for a high-performance regulatory calcul
 
 ## Current Architecture Overview
 
-### High-Level Data Flow
+### DAG-Based Pipeline Architecture
 
 ```mermaid
 graph TB
-    subgraph "Data Sources"
-        DS[Deal Systems]
-        RS[Reference Data]
-        MS[Market Data]
+    subgraph "Airflow DAG - Regulatory Calculation Pipeline"
+        subgraph "Data Ingestion"
+            DI[Deal Ingestion<br/>Operator]
+            RI[Reference Data<br/>Operator]
+            MI[Market Data<br/>Operator]
+        end
+        
+        subgraph "Core Processing"
+            EN[Enrichment<br/>Operator]
+            LC[Liquidity Calc<br/>Operator]
+            HC[Haircut Calc<br/>Operator]
+            AGG1[Aggregation<br/>Operator<br/>📝 Write Required]
+        end
+        
+        subgraph "Adjustments"
+            ADJ1[Adjustment<br/>Operator]
+            ADJ2[Adjustment<br/>Operator]
+        end
+        
+        subgraph "Final Processing"
+            FC[Final Calc<br/>Operator]
+            AGG2[Final Aggregation<br/>Operator<br/>📝 Write Required]
+            SS[Star Schema<br/>Operator]
+        end
+        
+        subgraph "Output"
+            S3W[S3 Writer<br/>Operator]
+            RSW[Redshift Writer<br/>Operator]
+        end
+        
+        DI --> EN
+        RI --> EN
+        MI --> EN
+        EN --> LC
+        LC --> HC
+        HC --> AGG1
+        AGG1 --> ADJ1
+        ADJ1 --> FC
+        FC --> ADJ2
+        ADJ2 --> AGG2
+        AGG2 --> SS
+        SS --> S3W
+        SS --> RSW
+        
+        style AGG1 fill:#ffcccc
+        style AGG2 fill:#ffcccc
+        style ADJ1 fill:#ccffcc
+        style ADJ2 fill:#ccffcc
+        style SS fill:#ccccff
     end
-    
-    subgraph "Processing Layer - EKS Spark"
-        SP[PySpark Processing]
-        AL[Adjustment Layer]
-        LT[Lineage Tracker]
-    end
-    
-    subgraph "Storage Layer"
-        S3[S3 Data Lake]
-        RS_DB[(Redshift)]
-    end
-    
-    subgraph "Visualization"
-        PBI[PowerBI]
-        REP[Regulatory Reports]
-    end
-    
-    DS --> SP
-    RS --> SP
-    MS --> SP
-    SP --> AL
-    AL --> LT
-    LT --> S3
-    S3 --> RS_DB
-    RS_DB --> PBI
-    PBI --> REP
-    
-    style AL fill:#f9f,stroke:#333,stroke-width:4px
-    style LT fill:#bbf,stroke:#333,stroke-width:4px
 ```
 
 ### Key Architectural Principles
 
-1. **Lineage Preservation**: Every transformation preserves primary keys through custom PySpark wrappers
-2. **Flexible Adjustments**: Rule-based adjustments can be injected at any processing stage
-3. **Performance**: Distributed processing on EKS for scalability
-4. **Auditability**: Complete traceability from source to final metrics
+1. **DAG-Based Workflow**: Each pipeline is an Airflow DAG with operators as nodes
+2. **Lineage Preservation**: Every operator maintains row-level tracing through primary keys
+3. **Smart Persistence**: Files written only when aggregations would lose tracing
+4. **Flexible Adjustments**: Adjustment operators can be injected at any DAG node
+5. **Visual Configuration**: DAG builder UI for pipeline construction
 
 ## Core Components
 
-### Component Architecture
+### Operator Architecture
 
 ```mermaid
 classDiagram
-    class SparkProcessor {
-        +process_deals()
-        +apply_transformations()
-        +calculate_metrics()
+    class BaseOperator {
+        <<abstract>>
+        +execute(input_df: DataFrame): DataFrame
+        +preserve_lineage(df: DataFrame): DataFrame
+        +should_persist(): bool
+        +get_output_schema(): StructType
     }
     
-    class AdjustmentEngine {
-        +load_rules()
+    class TransformOperator {
+        +transformation_logic()
+        +maintains_keys: bool = true
+    }
+    
+    class AggregationOperator {
+        +aggregation_logic()
+        +maintains_keys: bool = false
+        +write_before_aggregate: bool = true
+    }
+    
+    class AdjustmentOperator {
+        +adjustment_rules: RuleTable
         +apply_adjustments()
-        +validate_rules()
+        +track_adjustments()
+    }
+    
+    class StarSchemaOperator {
+        +input_tables: Dict
+        +relationships: List
+        +generate_star_schema()
     }
     
     class LineageTracker {
-        +inject_keys()
         +track_transformation()
-        +generate_lineage_map()
+        +persist_lineage_checkpoint()
+        +restore_lineage_path()
     }
     
-    class OperatorWrapper {
-        +wrap_operator()
-        +preserve_keys()
-        +track_operation()
-    }
-    
-    class CacheManager {
-        +cache_stage()
-        +invalidate_cache()
-        +get_cached_result()
-    }
-    
-    class RecalcOptimizer {
-        +analyze_impact()
-        +plan_recalc()
-        +execute_incremental()
-    }
-    
-    SparkProcessor --> AdjustmentEngine
-    SparkProcessor --> LineageTracker
-    LineageTracker --> OperatorWrapper
-    AdjustmentEngine --> RecalcOptimizer
-    RecalcOptimizer --> CacheManager
+    BaseOperator <|-- TransformOperator
+    BaseOperator <|-- AggregationOperator
+    BaseOperator <|-- AdjustmentOperator
+    BaseOperator <|-- StarSchemaOperator
+    BaseOperator --> LineageTracker
 ```
 
-### Processing Stage Flow
+### DAG Execution Flow
 
 ```mermaid
-stateDiagram-v2
-    [*] --> RawDataIngestion
-    RawDataIngestion --> DataValidation
-    DataValidation --> InitialCalculations
+sequenceDiagram
+    participant Airflow
+    participant Operator
+    participant LineageTracker
+    participant S3
+    participant Spark
     
-    state AdjustmentDecision <<choice>>
-    InitialCalculations --> AdjustmentDecision
+    Airflow->>Operator: Execute task
+    Operator->>Spark: Load input data
+    Operator->>LineageTracker: Register input keys
     
-    AdjustmentDecision --> ApplyDealLevelAdjustments: Deal-level adjustment needed
-    AdjustmentDecision --> IntermediateCalculations: No adjustment
+    alt Is Aggregation Operator
+        Operator->>S3: Write checkpoint before aggregation
+        LineageTracker->>S3: Write lineage mapping
+    end
     
-    ApplyDealLevelAdjustments --> IntermediateCalculations
-    IntermediateCalculations --> Aggregation
+    Operator->>Spark: Execute transformation
+    Operator->>LineageTracker: Track key transformations
     
-    state FinalAdjustmentDecision <<choice>>
-    Aggregation --> FinalAdjustmentDecision
+    alt Should persist output
+        Operator->>S3: Write output data
+    else Keep in memory
+        Operator->>Spark: Cache for next operator
+    end
     
-    FinalAdjustmentDecision --> ApplyStatisticalAdjustments: Statistical adjustment needed
-    FinalAdjustmentDecision --> FinalMetrics: No adjustment
+    Operator->>Airflow: Task complete
+```
+
+## Adjustment System Design
+
+### Flexible Adjustment Injection
+
+```python
+class AdjustmentOperator(BaseOperator):
+    """
+    Can be injected at any point in the DAG to apply adjustments
+    """
     
-    ApplyStatisticalAdjustments --> FinalMetrics
-    FinalMetrics --> S3Storage
-    S3Storage --> RedshiftLoad
-    RedshiftLoad --> PowerBIRefresh
-    PowerBIRefresh --> [*]
+    def __init__(self, operator_id: str, adjustment_rules: DataFrame):
+        self.operator_id = operator_id
+        self.adjustment_rules = adjustment_rules
+        self.maintains_keys = True  # Always preserves lineage
+        
+    def execute(self, input_df: DataFrame) -> DataFrame:
+        # Apply adjustments while maintaining full lineage
+        adjusted_df = self.apply_rule_based_adjustments(input_df)
+        
+        # Track what was adjusted
+        adjustment_tracking = self.create_adjustment_audit(
+            input_df, 
+            adjusted_df,
+            self.adjustment_rules
+        )
+        
+        # Store adjustment lineage
+        self.persist_adjustment_lineage(adjustment_tracking)
+        
+        return adjusted_df
+    
+    def supports_parallel_execution(self) -> bool:
+        """Adjustments can run in parallel scenarios"""
+        return True
+
+class DAGBuilder:
+    """
+    Visual DAG builder that allows adjustment injection
+    """
+    
+    def inject_adjustment_operator(
+        self, 
+        dag: DAG, 
+        after_operator_id: str,
+        adjustment_rules: DataFrame
+    ) -> DAG:
+        """
+        Inject an adjustment operator at any point in the DAG
+        """
+        # Create new adjustment operator
+        adj_op = AdjustmentOperator(
+            f"adjustment_{after_operator_id}",
+            adjustment_rules
+        )
+        
+        # Rewire DAG to include adjustment
+        original_downstream = dag.get_downstream(after_operator_id)
+        dag.add_edge(after_operator_id, adj_op.operator_id)
+        
+        for downstream_op in original_downstream:
+            dag.add_edge(adj_op.operator_id, downstream_op)
+            
+        return dag
+```
+
+### Smart Persistence Strategy
+
+```python
+class SmartPersistenceManager:
+    """
+    Determines when to persist data based on lineage requirements
+    """
+    
+    def __init__(self):
+        self.lineage_tracker = LineageTracker()
+        
+    def should_persist(self, operator: BaseOperator, input_df: DataFrame) -> bool:
+        """
+        Persist data when:
+        1. Aggregation will lose row-level keys
+        2. Explicit checkpoint requested
+        3. Memory pressure threshold exceeded
+        """
+        
+        if isinstance(operator, AggregationOperator):
+            # Always persist before aggregations
+            return True
+            
+        if operator.is_checkpoint:
+            # Explicit checkpoint requested
+            return True
+            
+        if self.estimate_memory_usage(input_df) > self.memory_threshold:
+            # Memory pressure - persist to S3
+            return True
+            
+        return False
+    
+    def persist_with_lineage(self, df: DataFrame, operator_id: str, path: str):
+        """
+        Persist data and its lineage information
+        """
+        # Write data
+        df.write.mode("overwrite").parquet(path)
+        
+        # Write lineage metadata
+        lineage_info = {
+            "operator_id": operator_id,
+            "row_count": df.count(),
+            "key_columns": self.identify_key_columns(df),
+            "schema": df.schema.json(),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        self.write_lineage_metadata(lineage_info, f"{path}/_lineage")
+```
+
+## DAG-Based Pipeline Implementation
+
+### Visual DAG Builder
+
+```python
+@dataclass
+class OperatorConfig:
+    """Configuration for each operator in the DAG"""
+    operator_type: str
+    operator_id: str
+    parameters: Dict[str, Any]
+    inputs: List[str]
+    outputs: List[str]
+
+class VisualDAGBuilder:
+    """
+    Allows users to visually build and configure DAGs
+    """
+    
+    def __init__(self):
+        self.operators = {}
+        self.connections = []
+        
+    def add_operator(self, config: OperatorConfig) -> 'VisualDAGBuilder':
+        """Add an operator to the DAG"""
+        
+        operator_class = self.get_operator_class(config.operator_type)
+        operator = operator_class(**config.parameters)
+        operator.operator_id = config.operator_id
+        
+        self.operators[config.operator_id] = operator
+        return self
+    
+    def connect(self, from_id: str, to_id: str) -> 'VisualDAGBuilder':
+        """Connect two operators"""
+        self.connections.append((from_id, to_id))
+        return self
+    
+    def inject_adjustment(
+        self, 
+        after_operator_id: str, 
+        adjustment_rules: DataFrame
+    ) -> 'VisualDAGBuilder':
+        """Inject an adjustment operator after specified operator"""
+        
+        adj_id = f"adj_{after_operator_id}_{uuid.uuid4().hex[:8]}"
+        adj_config = OperatorConfig(
+            operator_type="adjustment",
+            operator_id=adj_id,
+            parameters={"rules": adjustment_rules},
+            inputs=[after_operator_id],
+            outputs=[]
+        )
+        
+        self.add_operator(adj_config)
+        
+        # Rewire connections
+        new_connections = []
+        for from_id, to_id in self.connections:
+            if from_id == after_operator_id:
+                new_connections.append((from_id, adj_id))
+                new_connections.append((adj_id, to_id))
+            else:
+                new_connections.append((from_id, to_id))
+                
+        self.connections = new_connections
+        return self
+    
+    def build_airflow_dag(self) -> DAG:
+        """Convert visual DAG to Airflow DAG"""
+        
+        dag = DAG(
+            'regulatory_calculation_pipeline',
+            schedule_interval='@daily',
+            catchup=False
+        )
+        
+        # Create Airflow tasks
+        tasks = {}
+        for op_id, operator in self.operators.items():
+            task = PythonOperator(
+                task_id=op_id,
+                python_callable=operator.execute_with_lineage,
+                dag=dag
+            )
+            tasks[op_id] = task
+        
+        # Set dependencies
+        for from_id, to_id in self.connections:
+            tasks[from_id] >> tasks[to_id]
+            
+        return dag
+```
+
+### Example DAG Configuration
+
+```python
+class RegulatoryCalculationDAG:
+    """
+    Example of a complete regulatory calculation DAG
+    """
+    
+    def build_dag(self) -> DAG:
+        builder = VisualDAGBuilder()
+        
+        # Data ingestion
+        builder.add_operator(OperatorConfig(
+            operator_type="ingestion",
+            operator_id="ingest_deals",
+            parameters={"source": "s3://data/raw/deals"},
+            inputs=[],
+            outputs=["deals_df"]
+        ))
+        
+        # Enrichment
+        builder.add_operator(OperatorConfig(
+            operator_type="enrichment",
+            operator_id="enrich_deals",
+            parameters={"reference_data": "s3://data/reference"},
+            inputs=["deals_df"],
+            outputs=["enriched_df"]
+        ))
+        
+        # Liquidity calculation
+        builder.add_operator(OperatorConfig(
+            operator_type="calculation",
+            operator_id="calc_liquidity",
+            parameters={"calculation_type": "lcr"},
+            inputs=["enriched_df"],
+            outputs=["liquidity_df"]
+        ))
+        
+        # Aggregation (will trigger persistence)
+        builder.add_operator(OperatorConfig(
+            operator_type="aggregation",
+            operator_id="agg_by_entity",
+            parameters={"group_by": ["entity_id", "date"]},
+            inputs=["liquidity_df"],
+            outputs=["aggregated_df"]
+        ))
+        
+        # Star schema generation
+        builder.add_operator(OperatorConfig(
+            operator_type="star_schema",
+            operator_id="generate_star",
+            parameters={
+                "fact_table": "liquidity_metrics",
+                "dimensions": ["entity", "date", "product"]
+            },
+            inputs=["aggregated_df"],
+            outputs=["star_schema"]
+        ))
+        
+        # Connect operators
+        (builder
+            .connect("ingest_deals", "enrich_deals")
+            .connect("enrich_deals", "calc_liquidity")
+            .connect("calc_liquidity", "agg_by_entity")
+            .connect("agg_by_entity", "generate_star"))
+        
+        return builder.build_airflow_dag()
+```
+
+### Parallel Execution for Impact Analysis
+
+```python
+class ParallelAdjustmentAnalyzer:
+    """
+    Run multiple adjustment scenarios in parallel to analyze impact
+    """
+    
+    def __init__(self, base_dag: DAG):
+        self.base_dag = base_dag
+        
+    def analyze_adjustment_impact(
+        self,
+        adjustment_scenarios: List[AdjustmentScenario],
+        injection_points: List[str]
+    ) -> DataFrame:
+        """
+        Run parallel DAGs with different adjustments
+        """
+        
+        results = []
+        
+        # Create parallel DAGs for each scenario
+        parallel_dags = []
+        for scenario in adjustment_scenarios:
+            for injection_point in injection_points:
+                # Clone base DAG
+                scenario_dag = self.clone_dag(self.base_dag)
+                
+                # Inject adjustment
+                scenario_dag = self.inject_adjustment(
+                    scenario_dag,
+                    injection_point,
+                    scenario.rules
+                )
+                
+                parallel_dags.append({
+                    "dag": scenario_dag,
+                    "scenario": scenario.name,
+                    "injection_point": injection_point
+                })
+        
+        # Execute in parallel
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = []
+            for dag_info in parallel_dags:
+                future = executor.submit(
+                    self.execute_dag,
+                    dag_info["dag"],
+                    dag_info["scenario"],
+                    dag_info["injection_point"]
+                )
+                futures.append(future)
+            
+            # Collect results
+            for future in as_completed(futures):
+                result = future.result()
+                results.append(result)
+        
+        # Compare results
+        return self.create_impact_analysis(results)
+    
+    def create_impact_analysis(self, results: List[Dict]) -> DataFrame:
+        """
+        Create comprehensive impact analysis report
+        """
+        
+        analysis_df = self.spark.createDataFrame(results)
+        
+        # Calculate impact metrics
+        impact_metrics = analysis_df.groupBy("scenario", "injection_point").agg(
+            F.sum("records_affected").alias("total_records_affected"),
+            F.avg("liquidity_change_pct").alias("avg_liquidity_change"),
+            F.max("max_entity_impact").alias("max_entity_impact"),
+            F.collect_list("affected_entities").alias("all_affected_entities")
+        )
+        
+        return impact_metrics
 ```
 
 ## Adjustment System Design
@@ -927,115 +1306,251 @@ class LineageTracker:
 
 ## Monitoring and Observability
 
-### Key Metrics Dashboard
+### DAG Execution Monitoring
 
 ```mermaid
 graph LR
-    subgraph "Performance Metrics"
-        PT[Processing Time]
-        TPT[Throughput]
-        CU[CPU Utilization]
-        MU[Memory Usage]
-    end
-    
-    subgraph "Adjustment Metrics"
-        AC[Adjustments Count]
-        ART[Avg Recalc Time]
-        CHR[Cache Hit Rate]
-        ARC[Affected Records]
-    end
-    
-    subgraph "Data Quality"
-        DQ[Quality Score]
-        VAL[Validation Pass %]
-        LIN[Lineage Coverage]
-    end
-    
-    subgraph "Business Metrics"
-        LCR[LCR Calculation]
-        NSFR[NSFR Values]
-        ADJ[Adjustment Impact]
+    subgraph "DAG Monitoring Dashboard"
+        subgraph "Execution Metrics"
+            RT[Run Time]
+            SR[Success Rate]
+            RP[Records Processed]
+        end
+        
+        subgraph "Lineage Metrics"
+            KC[Keys Preserved]
+            WP[Write Points]
+            LB[Lineage Breaks]
+        end
+        
+        subgraph "Adjustment Metrics"
+            AI[Adjustments Injected]
+            RA[Records Adjusted]
+            PI[Performance Impact]
+        end
+        
+        subgraph "Resource Usage"
+            MU[Memory Usage]
+            CU[CPU Usage]
+            SU[S3 Storage]
+        end
     end
 ```
 
 ### Monitoring Implementation
 
 ```python
-class PipelineMonitor:
+class DAGMonitor:
+    """
+    Comprehensive monitoring for DAG-based pipelines
+    """
+    
     def __init__(self):
-        self.metrics = MetricsCollector()
+        self.metrics_collector = MetricsCollector()
         
-    def track_stage_execution(self, stage_name, func):
-        def monitored_func(*args, **kwargs):
+    def monitor_operator_execution(self, operator: BaseOperator):
+        """Monitor individual operator execution"""
+        
+        @functools.wraps(operator.execute)
+        def monitored_execute(input_df):
             start_time = time.time()
+            initial_keys = self.extract_keys(input_df)
             
-            try:
-                result = func(*args, **kwargs)
+            # Execute operator
+            result_df = operator.execute(input_df)
+            
+            # Collect metrics
+            metrics = {
+                "operator_id": operator.operator_id,
+                "operator_type": operator.__class__.__name__,
+                "duration": time.time() - start_time,
+                "input_records": input_df.count(),
+                "output_records": result_df.count(),
+                "keys_preserved": self.verify_key_preservation(
+                    initial_keys, 
+                    self.extract_keys(result_df)
+                ),
+                "memory_usage": self.get_memory_usage(),
+                "data_persisted": operator.should_persist()
+            }
+            
+            self.metrics_collector.record(metrics)
+            
+            # Alert on anomalies
+            if not metrics["keys_preserved"] and operator.maintains_keys:
+                self.alert_lineage_break(operator, metrics)
                 
-                self.metrics.record({
-                    'stage': stage_name,
-                    'duration': time.time() - start_time,
-                    'records_processed': result.count(),
-                    'status': 'success'
-                })
-                
-                return result
-                
-            except Exception as e:
-                self.metrics.record({
-                    'stage': stage_name,
-                    'duration': time.time() - start_time,
-                    'status': 'failed',
-                    'error': str(e)
-                })
-                raise
+            return result_df
+            
+        return monitored_execute
+    
+    def monitor_adjustment_impact(self, adjustment_operator: AdjustmentOperator):
+        """Special monitoring for adjustment operators"""
         
-        return monitored_func
+        def monitored_adjustment(input_df):
+            # Track before state
+            before_snapshot = self.create_data_snapshot(input_df)
+            
+            # Apply adjustment
+            result_df = adjustment_operator.execute(input_df)
+            
+            # Track after state
+            after_snapshot = self.create_data_snapshot(result_df)
+            
+            # Calculate impact
+            impact_metrics = {
+                "records_modified": self.count_modified_records(
+                    before_snapshot, 
+                    after_snapshot
+                ),
+                "value_change_distribution": self.calculate_value_changes(
+                    before_snapshot,
+                    after_snapshot
+                ),
+                "affected_entities": self.get_affected_entities(
+                    before_snapshot,
+                    after_snapshot
+                )
+            }
+            
+            self.publish_adjustment_metrics(adjustment_operator, impact_metrics)
+            
+            return result_df
+            
+        return monitored_adjustment
+
+class OperatorMetricsCollector:
+    """
+    Collects and aggregates operator-level metrics
+    """
+    
+    def __init__(self):
+        self.metrics_store = []
+        
+    def get_operator_performance_summary(self, dag_run_id: str) -> DataFrame:
+        """
+        Generate performance summary for all operators in a DAG run
+        """
+        
+        metrics_df = self.spark.createDataFrame(self.metrics_store)
+        
+        return metrics_df.filter(
+            F.col("dag_run_id") == dag_run_id
+        ).groupBy("operator_id", "operator_type").agg(
+            F.avg("duration").alias("avg_duration"),
+            F.sum("input_records").alias("total_input_records"),
+            F.sum("output_records").alias("total_output_records"),
+            F.avg("memory_usage").alias("avg_memory_usage"),
+            F.sum(F.when(F.col("data_persisted"), 1).otherwise(0))
+                .alias("persistence_count")
+        ).orderBy("avg_duration", ascending=False)
 ```
 
 ## Best Practices and Recommendations
 
-### 1. Adjustment Governance
-- All adjustments must be approved through workflow
-- Maintain audit trail of all adjustments
-- Regular review of active adjustment rules
-- Automated testing of adjustment impacts
+### 1. DAG Design Principles
+- **Modular Operators**: Each operator should have a single, clear responsibility
+- **Explicit Persistence**: Only persist when lineage would be lost (aggregations)
+- **Adjustment Points**: Design DAGs with natural adjustment injection points
+- **Parallel-Friendly**: Structure DAGs to allow parallel scenario execution
 
-### 2. Performance Optimization
-- **For S3 Staging**: Target file sizes of 128MB, use partition pruning
-- **For Direct Writes**: Limit to <100K records, use connection pooling
-- **For Hybrid Approach**: Monitor thresholds and adjust dynamically
-- Implement bloom filters for join optimization
-- Monitor and tune Spark resource allocation
+### 2. Lineage Management
+- **Always Preserve Keys**: Every operator must maintain or map primary keys
+- **Checkpoint Strategy**: Write checkpoints before any operation that loses row-level detail
+- **Lineage Documentation**: Store lineage metadata alongside data files
+- **Recovery Paths**: Design for easy replay from any checkpoint
 
-### 3. Data Quality
-- Validate adjustments before application
-- Implement circuit breakers for large impacts
-- Regular reconciliation with source systems
-- Automated data quality checks at each stage
+### 3. Performance Optimization
+- **Smart Caching**: Cache within Spark when data will be reused in the DAG
+- **Lazy Persistence**: Only write to S3 when necessary for lineage
+- **Partition Alignment**: Ensure operators respect and maintain partitioning
+- **Resource Allocation**: Size Spark executors based on operator requirements
 
-### 4. Operational Excellence
-- Automated deployment pipelines
-- Blue-green deployments for Spark jobs
-- Comprehensive logging and monitoring
-- Regular disaster recovery testing
+### 4. Adjustment Best Practices
+- **Rule Validation**: Validate adjustment rules before DAG execution
+- **Impact Preview**: Run test adjustments on sample data first
+- **Parallel Scenarios**: Use parallel DAG execution for what-if analysis
+- **Audit Trail**: Maintain complete history of all adjustments applied
 
-### 5. Direct Write Specific Best Practices
-- **Connection Management**: Use connection pooling, limit concurrent connections to 10
-- **Batch Sizing**: Optimal batch size is 10K-25K records for JDBC writes
-- **Transaction Management**: Use explicit transactions for consistency
-- **Monitoring**: Track write throughput and Redshift load metrics
-- **Fallback Strategy**: Always have S3 staging as fallback for direct write failures
+### 5. Monitoring and Alerting
+- **Operator SLAs**: Set performance thresholds for each operator type
+- **Lineage Verification**: Alert immediately on unexpected lineage breaks
+- **Resource Monitoring**: Track memory and CPU per operator
+- **Data Quality Checks**: Validate output at each DAG stage
 
-## Performance Benchmarks
+## Example: Complete DAG with Adjustments
 
-| Write Method | Records | Time | Throughput | Cost |
-|--------------|---------|------|------------|------|
-| Direct Write (JDBC) | 50K | 45s | 1.1K/s | Low |
-| Direct Write (JDBC) | 500K | 12m | 694/s | Medium |
-| S3 Staging (COPY) | 500K | 2m | 4.2K/s | Medium |
-| S3 Staging (COPY) | 50M | 15m | 55K/s | High |
-| Hybrid (Auto) | Mixed | Varies | Optimal | Optimal |
+```python
+# Example of building a complete regulatory calculation DAG
+def build_regulatory_dag():
+    """
+    Build a complete DAG with multiple adjustment injection points
+    """
+    
+    builder = VisualDAGBuilder()
+    
+    # Define the base DAG
+    dag_config = {
+        "operators": [
+            {"id": "ingest", "type": "ingestion", "params": {"source": "deals"}},
+            {"id": "enrich", "type": "enrichment", "params": {"refs": ["entities", "products"]}},
+            {"id": "calc_base", "type": "calculation", "params": {"metric": "base_liquidity"}},
+            {"id": "calc_haircut", "type": "calculation", "params": {"metric": "haircut"}},
+            {"id": "agg_entity", "type": "aggregation", "params": {"by": ["entity_id", "date"]}},
+            {"id": "calc_final", "type": "calculation", "params": {"metric": "lcr"}},
+            {"id": "agg_final", "type": "aggregation", "params": {"by": ["date"]}},
+            {"id": "star_schema", "type": "star_schema", "params": {"target": "liquidity_facts"}}
+        ],
+        "connections": [
+            ("ingest", "enrich"),
+            ("enrich", "calc_base"),
+            ("calc_base", "calc_haircut"),
+            ("calc_haircut", "agg_entity"),
+            ("agg_entity", "calc_final"),
+            ("calc_final", "agg_final"),
+            ("agg_final", "star_schema")
+        ]
+    }
+    
+    # Build base DAG
+    for op in dag_config["operators"]:
+        builder.add_operator(OperatorConfig(
+            operator_type=op["type"],
+            operator_id=op["id"],
+            parameters=op["params"],
+            inputs=[],
+            outputs=[]
+        ))
+    
+    for from_id, to_id in dag_config["connections"]:
+        builder.connect(from_id, to_id)
+    
+    # Example: Inject adjustments at different points
+    # Adjustment 1: After enrichment (deal-level adjustments)
+    builder.inject_adjustment(
+        after_operator_id="enrich",
+        adjustment_rules=load_deal_adjustments()
+    )
+    
+    # Adjustment 2: After entity aggregation (entity-level adjustments)
+    builder.inject_adjustment(
+        after_operator_id="agg_entity",
+        adjustment_rules=load_entity_adjustments()
+    )
+    
+    return builder.build_airflow_dag()
+
+# Run parallel scenarios
+analyzer = ParallelAdjustmentAnalyzer(build_regulatory_dag())
+impact_report = analyzer.analyze_adjustment_impact(
+    adjustment_scenarios=[
+        AdjustmentScenario("conservative", conservative_rules),
+        AdjustmentScenario("baseline", baseline_rules),
+        AdjustmentScenario("optimistic", optimistic_rules)
+    ],
+    injection_points=["enrich", "calc_base", "agg_entity"]
+)
+```
 
 ## Conclusion
 
